@@ -1,0 +1,11 @@
+{
+	"id": "ultimate-todoist-sync-reborn",
+	"name": "Ultimate Todoist Sync: Reborn",
+	"version": "1.0.0",
+	"minAppVersion": "1.0.0",
+	"description": "This is a fork of the best Todoist task synchronization plugin for Obsidian.",
+	"author": "Eric Van Johnson",
+	"authorUrl": "https://github.com/phparch/",
+	"fundingUrl": "",
+	"isDesktopOnly": false
+}
