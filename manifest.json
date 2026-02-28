@@ -3,9 +3,8 @@
 	"name": "Ultimate Todoist Sync: Reborn",
 	"version": "1.0.0",
 	"minAppVersion": "1.0.0",
-	"description": "One great Todoist task synchronization plugin.",
+	"description": "Sync tasks between Todoist and your vault.",
 	"author": "Eric Van Johnson",
 	"authorUrl": "https://github.com/phparch/",
-	"fundingUrl": "",
 	"isDesktopOnly": false
 }

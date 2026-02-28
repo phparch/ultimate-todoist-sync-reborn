@@ -2,47 +2,6 @@ import { App} from 'obsidian';
 import UltimateTodoistSyncForObsidian from "../main";
 
 
-
-
-interface dataviewTaskObject {
-    status: string;
-    checked: boolean;
-    completed: boolean;
-    fullyCompleted: boolean;
-    text: string;
-    visual: string;
-    line: number;
-    lineCount: number;
-    path: string;
-    section: string;
-    tags: string[];
-    outlinks: string[];
-    link: string;
-    children: any[];
-    task: boolean;
-    annotated: boolean;
-    parent: number;
-    blockId: string;
-}
-  
-  
-interface todoistTaskObject {
-    content: string;
-    description?: string;
-    project_id?: string;
-    section_id?: string;
-    parent_id?: string;
-    order?: number | null;
-    labels?: string[];
-    priority?: number | null;
-    due_string?: string;
-    due_date?: string;
-    due_datetime?: string;
-    due_lang?: string;
-    assignee_id?: string;
-}
-  
-
 const keywords = {
     TODOIST_TAG: "#todoist",
     DUE_DATE: "🗓️|📅|📆|🗓",
@@ -86,12 +45,12 @@ export class TaskParser   {
 	}
 
 
-  
-  
+
+
     //convert line text to a task object
-    async convertTextToTodoistTaskObject(lineText:string,filepath:string,lineNumber?:number,fileContent?:string) {
+    convertTextToTodoistTaskObject(lineText:string,filepath:string,lineNumber?:number,fileContent?:string) {
         //console.log(`linetext is:${lineText}`)
-    
+
         let hasParent = false
         let parentId = null
         let parentTaskObject = null
@@ -118,7 +77,7 @@ export class TaskParser   {
             //if tab count is >= current line, skip
             if (this.getTabIndentation(line) >= this.getTabIndentation(lineText)) {
                     //console.log(`indent is ${this.getTabIndentation(line)}`)
-                    continue       
+                    continue
             }
             if((this.getTabIndentation(line) < this.getTabIndentation(lineText))){
                 //console.log(`indent is ${this.getTabIndentation(line)}`)
@@ -134,10 +93,10 @@ export class TaskParser   {
                 }
             }
         }
-    
-    
+
+
         }
-        
+
         const dueDate = this.getDueDateFromLineText(textWithoutIndentation)
         const labels =  this.getAllTagsFromLineText(textWithoutIndentation)
         //console.log(`labels is ${labels}`)
@@ -147,7 +106,7 @@ export class TaskParser   {
         //const projectId = await this.plugin.cacheOperation.getProjectIdByNameFromCache(projectName)
         //use tag as project name
 
-        let projectId = this.plugin.cacheOperation!.getDefaultProjectIdForFilepath(filepath as string)
+        let projectId = this.plugin.cacheOperation!.getDefaultProjectIdForFilepath(filepath)
         let projectName = this.plugin.cacheOperation!.getProjectNameByIdFromCache(projectId)
 
         if(hasParent){
@@ -157,7 +116,7 @@ export class TaskParser   {
         if(!hasParent){
                     //match tag and project
             for (const label of (labels || [])){
-        
+
                 //console.log(label)
                 let labelName = label.replace(/#/g, "");
                 //console.log(labelName)
@@ -182,7 +141,7 @@ export class TaskParser   {
             let url = encodeURI(`obsidian://open?vault=${this.app.vault.getName()}&file=${filepath}`)
             description =`[${filepath}](${url})`;
         }
-    
+
         const todoistTask = {
         projectId: projectId,
         content: content || '',
@@ -199,52 +158,52 @@ export class TaskParser   {
         //console.log(todoistTask)
         return todoistTask;
     }
-  
-  
-  
-  
+
+
+
+
     hasTodoistTag(text:string){
         //console.log("checking if contains todoist tag")
         //console.log(text)
         return(REGEX.TODOIST_TAG.test(text))
     }
-    
-  
-  
+
+
+
     hasTodoistId(text:string){
         const result = REGEX.TODOIST_ID.test(text)
         //console.log("checking if contains todoist id")
         //console.log(text)
         return(result)
     }
-  
-  
+
+
     hasDueDate(text:string){
         return(REGEX.DUE_DATE_WITH_EMOJ.test(text))
     }
-  
-  
+
+
     getDueDateFromLineText(text: string) {
         const result = REGEX.DUE_DATE.exec(text);
         return result ? result[1] : null;
     }
 
-  
-  
+
+
     getProjectNameFromLineText(text:string){
         const result = REGEX.PROJECT_NAME.exec(text);
         return result ? result[1] : null;
     }
-  
-  
+
+
     getTodoistIdFromLineText(text:string){
         //console.log(text)
         const result = REGEX.TODOIST_ID_NUM.exec(text);
         //console.log(result)
         return result ? result[1] : null;
     }
-  
-    getDueDateFromDataview(dataviewTask:any){
+
+    getDueDateFromDataview(dataviewTask: { due?: { toString(): string } }){
         if(!dataviewTask.due){
         return ""
         }
@@ -254,9 +213,9 @@ export class TaskParser   {
         }
 
     }
-  
-  
-  
+
+
+
     /*
     //convert line task to dataview task object
     async  getLineTask(filepath,line){
@@ -266,15 +225,15 @@ export class TaskParser   {
         //console.log(`dataview filepath is ${filepath}`)
         //console.log(`dataview line is ${line}`)
         //console.log(tasksValues)
-        const currentLineTask = tasksValues.find(obj => obj.line === line )	
+        const currentLineTask = tasksValues.find(obj => obj.line === line )
         console.log(currentLineTask)
         return(currentLineTask)
-    
+
     }
     */
-  
-  
-  
+
+
+
     getTaskContentFromLineText(lineText:string) {
         const TaskContent = lineText.replace(REGEX.TASK_CONTENT.REMOVE_INLINE_METADATA,"")
                                     .replace(REGEX.TASK_CONTENT.REMOVE_TODOIST_LINK,"")
@@ -286,8 +245,8 @@ export class TaskParser   {
                                     .replace(REGEX.TASK_CONTENT.REMOVE_SPACE,"")
         return(TaskContent)
     }
-  
-  
+
+
     //get all tags from task text
     getAllTagsFromLineText(lineText:string): string[] | null {
         const matches = lineText.match(REGEX.ALL_TAGS);
@@ -299,54 +258,54 @@ export class TaskParser   {
 
         return null;
     }
-  
+
     //get checkbox status
     isTaskCheckboxChecked(lineText:string) {
         return(REGEX.TASK_CHECKBOX_CHECKED.test(lineText))
     }
-  
-  
+
+
     //task content compare
-    taskContentCompare(lineTask:any,todoistTask:any) {
+    taskContentCompare(lineTask: { content: string },todoistTask: { content: string }) {
         const lineTaskContent = lineTask.content
         //console.log(dataviewTaskContent)
-        
+
         const todoistTaskContent = todoistTask.content
         //console.log(todoistTask.content)
 
         //check if content was modified
         const contentModified = (lineTaskContent === todoistTaskContent)
-        return(contentModified)  
+        return(contentModified)
     }
-  
-  
+
+
     //tag compare
-    taskTagCompare(lineTask:any,todoistTask:any) {
-    
-    
+    taskTagCompare(lineTask: { labels: string[] },todoistTask: { labels: string[] }) {
+
+
         const lineTaskTags = lineTask.labels
         //console.log(dataviewTaskTags)
-        
+
         const todoistTaskTags = todoistTask.labels
         //console.log(todoistTaskTags)
-    
+
         //check if content was modified
-        const tagsModified  = lineTaskTags.length === todoistTaskTags.length && lineTaskTags.sort().every((val: any, index: any) => val === todoistTaskTags.sort()[index]);
-        return(tagsModified) 
+        const tagsModified  = lineTaskTags.length === todoistTaskTags.length && lineTaskTags.sort().every((val: string, index: number) => val === todoistTaskTags.sort()[index]);
+        return(tagsModified)
     }
-  
+
     //task status compare
-    taskStatusCompare(lineTask:any,todoistTask:any) {
+    taskStatusCompare(lineTask: { isCompleted: boolean },todoistTask: { isCompleted: boolean }) {
         //check if status was modified
         const statusModified = (lineTask.isCompleted === todoistTask.isCompleted)
         //console.log(lineTask)
         //console.log(todoistTask)
         return(statusModified)
     }
-  
-  
+
+
     //task due date compare
-    async  compareTaskDueDate(lineTask: any, todoistTask: any): Promise<boolean> {
+    compareTaskDueDate(lineTask: { dueDate: string }, todoistTask: { due?: { date: string } | null }): boolean {
         const lineTaskDue = lineTask.dueDate
         const todoistTaskDue = todoistTask.due ?? "";
         //console.log(dataviewTaskDue)
@@ -355,20 +314,20 @@ export class TaskParser   {
         //console.log('no due date')
         return true;
         }
-    
+
         if ((lineTaskDue || todoistTaskDue) === "") {
-        console.log(lineTaskDue);
-        console.log(todoistTaskDue)
+        console.debug(lineTaskDue);
+        console.debug(todoistTaskDue)
         //console.log('due date has changed')
         return false;
         }
-        
+
         const oldDueDateUTCString = this.localDateStringToUTCDateString(lineTaskDue)
         if (oldDueDateUTCString === todoistTaskDue.date) {
         //console.log('due date is the same')
         return true;
         } else if (lineTaskDue.toString() === "Invalid Date" || todoistTaskDue.toString() === "Invalid Date") {
-        console.log('invalid date')
+        console.debug('invalid date')
         return false;
         } else {
         //console.log(lineTaskDue);
@@ -376,23 +335,23 @@ export class TaskParser   {
         return false;
         }
     }
-    
-  
+
+
     //task project id compare
-    async  taskProjectCompare(lineTask:any,todoistTask:any) {
+    taskProjectCompare(lineTask: { projectId: string },todoistTask: { projectId: string }) {
         //check if project was modified
         //console.log(dataviewTaskProjectId)
         //console.log(todoistTask.projectId)
         return(lineTask.projectId === todoistTask.projectId)
     }
-  
-  
+
+
     //check if task is indented
     isIndentedTask(text:string) {
         return(REGEX.TASK_INDENTATION.test(text));
     }
-  
-  
+
+
     //count number of tabs
     //console.log(getTabIndentation("\t\t- [x] This is a task with two tabs")); // 2
     //console.log(getTabIndentation("  - [x] This is a task without tabs")); // 0
@@ -407,22 +366,22 @@ export class TaskParser   {
         const match = REGEX.TASK_PRIORITY.exec(lineText)
         return match ? Number(match[1]) : 1;
     }
-  
-  
-  
+
+
+
     //remove task indentation
     removeTaskIndentation(text: string) {
         const regex = /^([ \t]*)?- \[(x| )\] /;
         return text.replace(regex, "- [$2] ");
     }
-  
-  
+
+
     //check if line is empty
     isLineBlank(lineText:string) {
         return(REGEX.BLANK_LINE.test(lineText))
     }
-  
-  
+
+
   //insert date in linetext
     insertDueDateBeforeTodoist(text: string, dueDate: string) {
         const regex = new RegExp(`(${keywords.TODOIST_TAG})`)
@@ -495,7 +454,7 @@ export class TaskParser   {
           return null;
         }
     }
-    
+
     //convert date from obsidian event
     // usage example
     //const str = "2023-03-27";
@@ -516,7 +475,7 @@ export class TaskParser   {
           return null;
         }
     }
-    
+
     isMarkdownTask(str: string): boolean {
         const taskRegex = /^\s*-\s+\[([x ])\]/;
         return taskRegex.test(str);

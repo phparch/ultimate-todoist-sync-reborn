@@ -1,11 +1,7 @@
 import UltimateTodoistSyncForObsidian from "../main";
 import { App, Editor, MarkdownView, Notice, TFile} from 'obsidian';
+import { TodoistTask, SyncEvent } from './settings';
 
-
-type FrontMatter = {
-    todoistTasks: string[];
-    todoistCount: number;
-  };
 
 export class TodoistSync  {
 	app:App;
@@ -22,7 +18,7 @@ export class TodoistSync  {
 
 
 
-      
+
     async deletedTaskCheck(file_path:string): Promise<void> {
 
         let file
@@ -31,7 +27,9 @@ export class TodoistSync  {
         let filepath
 
         if(file_path){
-            file = this.app.vault.getAbstractFileByPath(file_path) as TFile
+            const abstractFile = this.app.vault.getAbstractFileByPath(file_path)
+            if (!(abstractFile instanceof TFile)) return;
+            file = abstractFile
             filepath = file_path
             currentFileValue = await this.app.vault.read(file)
         }
@@ -45,60 +43,60 @@ export class TodoistSync  {
         }
 
 
-        //console.log(filepath)
+        //console.debug(filepath)
 
 
         //const frontMatter = await this.plugin.fileOperation.getFrontMatter(file);
         const frontMatter = await this.plugin.cacheOperation!.getFileMetadata(filepath!)
         if (!frontMatter || !frontMatter.todoistTasks) {
-          console.log('no tasks in frontmatter')
+          console.debug('no tasks in frontmatter')
           return;
         }
 
 
 
-        //console.log(currentFileValue)
+        //console.debug(currentFileValue)
         const currentFileValueWithOutFrontMatter = currentFileValue!.replace(/^---[\s\S]*?---\n/, '');
         const frontMatter_todoistTasks = frontMatter.todoistTasks;
         const frontMatter_todoistCount = frontMatter.todoistCount;
 
         const deleteTasksPromises = frontMatter_todoistTasks
-          .filter((taskId: any) => !currentFileValueWithOutFrontMatter.includes(taskId))
-          .map(async (taskId: any) => {
+          .filter((taskId: string) => !currentFileValueWithOutFrontMatter.includes(taskId))
+          .map(async (taskId: string) => {
             try {
-              //console.log(`initialize todoist api`)
+              //console.debug(`initialize todoist api`)
               const api = this.plugin.todoistRestAPI!.initializeAPI()
               const response = await api.deleteTask(taskId);
-              //console.log(`response is ${response}`);
-      
+              //console.debug(`response is ${response}`);
+
               if (response) {
-                //console.log(`task ${taskId} deleted successfully`);
-                new Notice(`task ${taskId} is deleted`)
+                //console.debug(`task ${taskId} deleted successfully`);
+                new Notice(`Task ${taskId} is deleted.`)
                 return taskId; // return the deleted task ID
               }
             } catch (error) {
               console.error(`Failed to delete task ${taskId}: ${error}`);
             }
           });
-      
+
         const deletedTaskIds = await Promise.all(deleteTasksPromises);
         const deletedTaskAmount = deletedTaskIds.length
         if (!deletedTaskIds.length) {
-          //console.log("no tasks deleted");
+          //console.debug("no tasks deleted");
           return;
         }
         this.plugin.cacheOperation!.deleteTaskFromCacheByIDs(deletedTaskIds)
-        //console.log(`deleted ${deletedTaskAmount} tasks`)
-        this.plugin.saveSettings()
+        //console.debug(`deleted ${deletedTaskAmount} tasks`)
+        void this.plugin.saveSettings()
         // update newFrontMatter_todoistTasks array
-        
+
         // Disable automatic merging
-       
+
         const newFrontMatter_todoistTasks = frontMatter_todoistTasks.filter(
-          (taskId: any) => !deletedTaskIds.includes(taskId)
+          (taskId: string) => !deletedTaskIds.includes(taskId)
         );
-      
-      
+
+
         /*
         await this.plugin.fileOperation.updateFrontMatter(file, (frontMatter) => {
           frontMatter.todoistTasks = newFrontMatter_todoistTasks;
@@ -119,29 +117,29 @@ export class TodoistSync  {
         const line = cursor.line
         const linetxt = editor.getLine(line)
 
-       
 
-    
-    
+
+
+
         if(this.plugin.settings.debugMode){
-            console.log(`lineContentNewTaskCheck: line=${line}, text="${linetxt}"`)
-            console.log(`  hasTodoistId=${this.plugin.taskParser!.hasTodoistId(linetxt)}, hasTodoistTag=${this.plugin.taskParser!.hasTodoistTag(linetxt)}`)
+            console.debug(`lineContentNewTaskCheck: line=${line}, text="${linetxt}"`)
+            console.debug(`  hasTodoistId=${this.plugin.taskParser!.hasTodoistId(linetxt)}, hasTodoistTag=${this.plugin.taskParser!.hasTodoistTag(linetxt)}`)
         }
 
         //add task
         if ((!this.plugin.taskParser!.hasTodoistId(linetxt) && this.plugin.taskParser!.hasTodoistTag(linetxt))) {   //check if contains #todoist
-            console.log('this is a new task')
-            console.log(linetxt)
+            console.debug('this is a new task')
+            console.debug(linetxt)
             const currentTask =await this.plugin.taskParser!.convertTextToTodoistTaskObject(linetxt,filepath!,line,fileContent)
-            //console.log(currentTask)
+            //console.debug(currentTask)
 
 
 
             try {
-                const newTask = await this.plugin.todoistRestAPI!.AddTask(currentTask as any)
-                const { id: todoist_id, projectId: todoist_projectId, url: todoist_url } = newTask;
-                (newTask as any).path = filepath;
-                //console.log(newTask);
+                const newTask = await this.plugin.todoistRestAPI!.AddTask(currentTask as Parameters<typeof this.plugin.todoistRestAPI.AddTask>[0])
+                const { id: todoist_id } = newTask;
+                Object.assign(newTask, { path: filepath });
+                //console.debug(newTask);
                 new Notice(`new task ${newTask.content} id is ${newTask.id}`)
                 //write newTask to cache
                 this.plugin.cacheOperation!.appendTaskToCache(newTask)
@@ -152,7 +150,7 @@ export class TodoistSync  {
                   this.plugin.cacheOperation!.closeTaskToCacheByID(todoist_id)
 
                 }
-                this.plugin.saveSettings()
+                void this.plugin.saveSettings()
 
                 //save todoist id after the task
                 const text_with_out_link = `${linetxt} %%[todoist_id:: ${todoist_id}]%%`;
@@ -166,17 +164,17 @@ export class TodoistSync  {
                 try {
                     // handle front matter
                     const frontMatter = await this.plugin.cacheOperation!.getFileMetadata(filepath!)
-                      //console.log(frontMatter);
+                      //console.debug(frontMatter);
 
                       if (!frontMatter) {
-                        //console.log('frontmatter is empty');
+                        //console.debug('frontmatter is empty');
                         //return;
                       }
-                  
+
                       // increment todoistCount by 1
                       const newFrontMatter = { ...frontMatter };
                       newFrontMatter.todoistCount = (newFrontMatter.todoistCount ?? 0) + 1;
-                  
+
                       // record taskID
                       newFrontMatter.todoistTasks = [...(newFrontMatter.todoistTasks || []), todoist_id];
 
@@ -187,7 +185,7 @@ export class TodoistSync  {
                         frontMatter.todoistCount = newFrontMatter.todoistCount;
                       });
                       */
-                      //console.log(newFrontMatter)
+                      //console.debug(newFrontMatter)
                       await this.plugin.cacheOperation!.updateFileMetadata(filepath!,newFrontMatter)
 
 
@@ -198,14 +196,14 @@ export class TodoistSync  {
 
               } catch (error) {
                     console.error('Error adding task:', error);
-                    console.log(`The error occurred in the file: ${filepath}`)
+                    console.debug(`The error occurred in the file: ${filepath}`)
                     return
               }
-    
+
         }
     }
-    
-    
+
+
     async fullTextNewTaskCheck(file_path:string): Promise<void>{
 
         let file
@@ -214,7 +212,9 @@ export class TodoistSync  {
         let filepath
 
         if(file_path){
-            file = this.app.vault.getAbstractFileByPath(file_path) as TFile
+            const abstractFile = this.app.vault.getAbstractFileByPath(file_path)
+            if (!(abstractFile instanceof TFile)) return;
+            file = abstractFile
             filepath = file_path
             currentFileValue = await this.app.vault.read(file)
         }
@@ -228,46 +228,46 @@ export class TodoistSync  {
         }
 
         if(this.plugin.settings.enableFullVaultSync){
-            //console.log('full vault sync enabled')
-            //console.log(filepath)
+            //console.debug('full vault sync enabled')
+            //console.debug(filepath)
             await this.plugin.fileOperation!.addTodoistTagToFile(filepath!)
         }
 
         const content = currentFileValue!
 
-        let newFrontMatter: any
+        let newFrontMatter: { todoistTasks: string[]; todoistCount: number }
         //frontMatteer
         const frontMatter = await this.plugin.cacheOperation!.getFileMetadata(filepath!)
-        //console.log(frontMatter);
-    
+        //console.debug(frontMatter);
+
         if (!frontMatter) {
-            console.log('frontmatter is empty');
-            newFrontMatter = {};
+            console.debug('frontmatter is empty');
+            newFrontMatter = { todoistTasks: [], todoistCount: 0 };
         }else{
             newFrontMatter = { ...frontMatter };
         }
 
-    
+
         let hasNewTask = false;
         const lines = content.split('\n')
-    
+
         for (let i = 0; i < lines.length; i++) {
         const line = lines[i]
         if (!this.plugin.taskParser!.hasTodoistId(line) && this.plugin.taskParser!.hasTodoistTag(line)) {
-            //console.log('this is a new task')
-            //console.log(`current line is ${i}`)
-            //console.log(`line text: ${line}`)
-            console.log(filepath)
+            //console.debug('this is a new task')
+            //console.debug(`current line is ${i}`)
+            //console.debug(`line text: ${line}`)
+            console.debug(filepath)
             const currentTask =await this.plugin.taskParser!.convertTextToTodoistTaskObject(line,filepath!,i,content)
             if(typeof currentTask === "undefined"){
                 continue
             }
-            console.log(currentTask)
+            console.debug(currentTask)
             try {
-                const newTask = await this.plugin.todoistRestAPI!.AddTask(currentTask as any)
-                const { id: todoist_id, projectId: todoist_projectId, url: todoist_url } = newTask;
-                (newTask as any).path = filepath;
-                console.log(newTask);
+                const newTask = await this.plugin.todoistRestAPI!.AddTask(currentTask as Parameters<typeof this.plugin.todoistRestAPI.AddTask>[0])
+                const { id: todoist_id } = newTask;
+                Object.assign(newTask, { path: filepath });
+                console.debug(newTask);
                 new Notice(`new task ${newTask.content} id is ${newTask.id}`)
                 //write newTask to JSON file
                 this.plugin.cacheOperation!.appendTaskToCache(newTask)
@@ -277,26 +277,26 @@ export class TodoistSync  {
                 await this.plugin.todoistRestAPI!.CloseTask(newTask.id)
                 this.plugin.cacheOperation!.closeTaskToCacheByID(todoist_id)
                 }
-                this.plugin.saveSettings()
-    
+                void this.plugin.saveSettings()
+
                 //save todoist id after the task
                 const text_with_out_link = `${line} %%[todoist_id:: ${todoist_id}]%%`;
                 const link = `[link](${newTask.url})`
                 const text = this.plugin.taskParser!.addTodoistLink(text_with_out_link,link)
                 lines[i] = text;
-    
+
                 newFrontMatter.todoistCount = (newFrontMatter.todoistCount ?? 0) + 1;
-                
+
                 // record taskID
                 newFrontMatter.todoistTasks = [...(newFrontMatter.todoistTasks || []), todoist_id];
-    
+
                 hasNewTask = true
-    
+
             } catch (error) {
                 console.error('Error adding task:', error);
                 continue
             }
-            
+
         }
         }
         if(hasNewTask){
@@ -304,9 +304,11 @@ export class TodoistSync  {
             try {
                 // save file
                 const newContent = lines.join('\n')
-                await this.app.vault.modify(file as TFile, newContent)
-    
-            
+                const abstractFile = this.app.vault.getAbstractFileByPath(filepath!)
+                if (!(abstractFile instanceof TFile)) return;
+                await this.app.vault.modify(abstractFile, newContent)
+
+
                 // update front matter
                 /*
                 this.plugin.fileOperation.updateFrontMatter(file, (frontMatter) => {
@@ -320,10 +322,10 @@ export class TodoistSync  {
             } catch (error) {
             console.error(error);
             }
-    
+
         }
-    
-    
+
+
     }
 
 
@@ -338,25 +340,25 @@ export class TodoistSync  {
             if(!metadata){
                 await this.plugin.cacheOperation!.newEmptyFileMetadata(filepath)
             }
-            this.plugin.saveSettings()
+            void this.plugin.saveSettings()
         }
 
         //check task
         if (this.plugin.taskParser!.hasTodoistId(lineText) && this.plugin.taskParser!.hasTodoistTag(lineText)) {
 
             const lineTask = await this.plugin.taskParser!.convertTextToTodoistTaskObject(lineText,filepath,lineNumber,fileContent)
-            //console.log(lastLineTask)
+            //console.debug(lastLineTask)
             const lineTask_todoist_id = (lineTask.todoist_id!).toString()
-            //console.log(lineTask_todoist_id )
-            //console.log(`lastline task id is ${lastLineTask_todoist_id}`)
+            //console.debug(lineTask_todoist_id )
+            //console.debug(`lastline task id is ${lastLineTask_todoist_id}`)
             const savedTask = await this.plugin.cacheOperation!.loadTaskFromCacheyID(lineTask_todoist_id)  //in dataview id is numeric, in todoist id is string, conversion needed
             if(!savedTask){
-                console.log(`task ${lineTask.todoist_id} not found in local cache`)
+                console.debug(`task ${lineTask.todoist_id} not found in local cache`)
                 const url = this.plugin.taskParser!.getObsidianUrlFromFilepath(filepath)
-                console.log(url)
+                console.debug(url)
                 return
             }
-        //console.log(savedTask)
+        //console.debug(savedTask)
 
             //check if content was modified
             const lineTaskContent = lineTask.content;
@@ -385,25 +387,25 @@ export class TodoistSync  {
             let dueDateChanged = false;
             let parentIdChanged = false;
             let priorityChanged = false;
-            
-            let updatedContent: Record<string, any> = {}
+
+            let updatedContent: Record<string, unknown> = {}
             if (contentModified) {
-                console.log(`Content modified for task ${lineTask_todoist_id}`)
+                console.debug(`Content modified for task ${lineTask_todoist_id}`)
                 updatedContent.content = lineTaskContent
                 contentChanged = true;
             }
 
             if (tagsModified) {
-                console.log(`Tags modified for task ${lineTask_todoist_id}`)
+                console.debug(`Tags modified for task ${lineTask_todoist_id}`)
                 updatedContent.labels = lineTask.labels
                 tagsChanged = true;
             }
-            
+
 
             if (dueDateModified) {
-                console.log(`Due date modified for task ${lineTask_todoist_id}`)
-                console.log(lineTask.dueDate)
-                //console.log(savedTask.due.date)
+                console.debug(`Due date modified for task ${lineTask_todoist_id}`)
+                console.debug(lineTask.dueDate)
+                //console.debug(savedTask.due.date)
                 if(lineTask.dueDate === ""){
                     updatedContent.dueString = "no date"
                 }else{
@@ -415,14 +417,14 @@ export class TodoistSync  {
 
             //todoist Rest API does not have move task to new project functionality
             if (projectModified) {
-                //console.log(`Project id modified for task ${lineTask_todoist_id}`)
+                //console.debug(`Project id modified for task ${lineTask_todoist_id}`)
                 //updatedContent.projectId = lineTask.projectId
                 //projectChanged = false;
             }
 
             //todoist Rest API does not have an endpoint for modifying parent id
             if (parentIdModified) {
-                //console.log(`Parnet id modified for task ${lineTask_todoist_id}`)
+                //console.debug(`Parnet id modified for task ${lineTask_todoist_id}`)
                 //updatedContent.parentId = lineTask.parentId
                 //parentIdChanged = false;
             }
@@ -435,37 +437,37 @@ export class TodoistSync  {
 
 
             if (contentChanged || tagsChanged ||dueDateChanged ||projectChanged || parentIdChanged || priorityChanged) {
-                //console.log("task content was modified");
-                //console.log(updatedContent)
+                //console.debug("task content was modified");
+                //console.debug(updatedContent)
                 const updatedTask = await this.plugin.todoistRestAPI!.UpdateTask(lineTask.todoist_id!.toString(),updatedContent)
-                ;(updatedTask as any).path = filepath
+                Object.assign(updatedTask, { path: filepath });
                 this.plugin.cacheOperation!.updateTaskToCacheByID(updatedTask);
             }
 
             if (statusModified) {
-                console.log(`Status modified for task ${lineTask_todoist_id}`)
+                console.debug(`Status modified for task ${lineTask_todoist_id}`)
                 if (lineTask.isCompleted === true) {
-                console.log(`task completed`)
-                this.plugin.todoistRestAPI!.CloseTask(lineTask.todoist_id!.toString());
+                console.debug(`task completed`)
+                await this.plugin.todoistRestAPI!.CloseTask(lineTask.todoist_id!.toString());
                 this.plugin.cacheOperation!.closeTaskToCacheByID( lineTask.todoist_id!.toString());
                 } else {
-                console.log(`task umcompleted`)
-                this.plugin.todoistRestAPI!.OpenTask(lineTask.todoist_id!.toString());
+                console.debug(`task umcompleted`)
+                await this.plugin.todoistRestAPI!.OpenTask(lineTask.todoist_id!.toString());
                 this.plugin.cacheOperation!.reopenTaskToCacheByID( lineTask.todoist_id!.toString());
                 }
-                
+
                 statusChanged = true;
             }
 
 
-            
+
             if (contentChanged || statusChanged ||dueDateChanged ||tagsChanged || projectChanged || priorityChanged) {
-                console.log(lineTask)
-                console.log(savedTask)
+                console.debug(lineTask)
+                console.debug(savedTask)
                 //`Task ${lastLineTaskTodoistId} was modified`
-                this.plugin.saveSettings()
+                void this.plugin.saveSettings()
                 let message = `Task ${lineTask_todoist_id} is updated.`;
-    
+
                 if (contentChanged) {
                     message += " Content was changed.";
                 }
@@ -484,13 +486,13 @@ export class TodoistSync  {
                 if (priorityChanged) {
                     message += " Priority was changed.";
                 }
-                
+
                 new Notice(message);
 
             } else {
-                //console.log(`Task ${lineTask_todoist_id} did not change`);
+                //console.debug(`Task ${lineTask_todoist_id} did not change`);
             }
-            
+
             } catch (error) {
             console.error('Error updating task:', error);
             }
@@ -506,10 +508,12 @@ export class TodoistSync  {
         let currentFileValue;
         let view;
         let filepath;
-      
+
         try {
           if (file_path) {
-            file = this.app.vault.getAbstractFileByPath(file_path) as TFile;
+            const abstractFile = this.app.vault.getAbstractFileByPath(file_path);
+            if (!(abstractFile instanceof TFile)) return;
+            file = abstractFile;
             filepath = file_path;
             currentFileValue = await this.app.vault.read(file);
           } else {
@@ -518,12 +522,12 @@ export class TodoistSync  {
             filepath = file?.path;
             currentFileValue = view?.data;
           }
-      
+
           const content = currentFileValue!;
 
           let hasModifiedTask = false;
           const lines = content.split('\n');
-      
+
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             if (this.plugin.taskParser!.hasTodoistId(line) && this.plugin.taskParser!.hasTodoistTag(line)) {
@@ -536,7 +540,7 @@ export class TodoistSync  {
               }
             }
           }
-      
+
           if (hasModifiedTask) {
             try {
               // Perform necessary actions on the modified content and front matter
@@ -556,7 +560,7 @@ export class TodoistSync  {
         await this.plugin.todoistRestAPI!.CloseTask(taskId);
         await this.plugin.fileOperation!.completeTaskInTheFile(taskId)
         await this.plugin.cacheOperation!.closeTaskToCacheByID(taskId);
-        this.plugin.saveSettings()
+        void this.plugin.saveSettings()
         new Notice(`Task ${taskId} is closed.`)
     } catch (error) {
         console.error('Error closing task:', error);
@@ -570,13 +574,13 @@ export class TodoistSync  {
             await this.plugin.todoistRestAPI!.OpenTask(taskId)
             await this.plugin.fileOperation!.uncompleteTaskInTheFile(taskId)
             await this.plugin.cacheOperation!.reopenTaskToCacheByID(taskId)
-            this.plugin.saveSettings()
-            new Notice(`Task ${taskId} is reopend.`)
+            void this.plugin.saveSettings()
+            new Notice(`Task ${taskId} is reopened.`)
         } catch (error) {
             console.error('Error opening task:', error);
             throw error; // throw error so caller can catch and handle it
         }
-    } 
+    }
 
 
     /**
@@ -591,10 +595,10 @@ export class TodoistSync  {
         const api = await this.plugin.todoistRestAPI!.initializeAPI()
         try {
         const response = await api.deleteTask(taskId);
-        console.log(`response is ${response}`);
+        console.debug(`response is ${response}`);
 
         if (response) {
-            //console.log(`Task ${taskId} deleted successfully`);
+            //console.debug(`Task ${taskId} deleted successfully`);
             new Notice(`Task ${taskId} is deleted.`)
             deletedTaskIds.push(taskId); // add deleted task ID to array
         }
@@ -605,36 +609,36 @@ export class TodoistSync  {
     }
 
     if (!deletedTaskIds.length) {
-        console.log("no tasks deleted");
+        console.debug("no tasks deleted");
         return [];
     }
 
     await this.plugin.cacheOperation!.deleteTaskFromCacheByIDs(deletedTaskIds); // update JSON file
-    this.plugin.saveSettings()
-    //console.log(`deleted ${deletedTaskIds.length} tasks in total`);
-    
+    void this.plugin.saveSettings()
+    //console.debug(`deleted ${deletedTaskIds.length} tasks in total`);
+
 
     return deletedTaskIds;
     }
 
 
-  
- 
-  
-  
+
+
+
+
 
 
 
     // sync completed task status to Obsidian file
-    async  syncCompletedTaskStatusToObsidian(unSynchronizedEvents: any[]) {
+    async  syncCompletedTaskStatusToObsidian(unSynchronizedEvents: SyncEvent[]) {
         // get unsynced events
-        //console.log(unSynchronizedEvents)    
+        //console.debug(unSynchronizedEvents)
         try {
-        
+
         // process unsynced events and wait for all to complete
         const processedEvents = []
         for (const e of unSynchronizedEvents) {   //to execute completeTaskInTheFile(e.objectId) sequentially, replace Promise.allSettled() with a for...of loop to process unsynced events
-            //console.log(`completing ${e.objectId}`)
+            //console.debug(`completing ${e.objectId}`)
             await this.plugin.fileOperation!.completeTaskInTheFile(e.objectId)
             await this.plugin.cacheOperation!.closeTaskToCacheByID(e.objectId)
             new Notice(`Task ${e.objectId} is closed.`)
@@ -644,10 +648,10 @@ export class TodoistSync  {
         // Save events to the local database."
         //const allEvents = [...savedEvents, ...unSynchronizedEvents]
         await this.plugin.cacheOperation!.appendEventsToCache(processedEvents)
-        this.plugin.saveSettings()
+        void this.plugin.saveSettings()
 
 
-        
+
 
 
         } catch (error) {
@@ -657,19 +661,19 @@ export class TodoistSync  {
 
 
     // sync uncompleted task status to Obsidian file
-    async  syncUncompletedTaskStatusToObsidian(unSynchronizedEvents: any[]) {
+    async  syncUncompletedTaskStatusToObsidian(unSynchronizedEvents: SyncEvent[]) {
 
-        //console.log(unSynchronizedEvents)
-    
+        //console.debug(unSynchronizedEvents)
+
         try {
-        
+
         // process unsynced events and wait for all to complete
         const processedEvents = []
         for (const e of unSynchronizedEvents) {   //to execute uncompleteTaskInTheFile(e.objectId) sequentially, replace Promise.allSettled() with a for...of loop to process unsynced events
-            //console.log(`unchecking task: ${e.objectId}`)
+            //console.debug(`unchecking task: ${e.objectId}`)
             await this.plugin.fileOperation!.uncompleteTaskInTheFile(e.objectId)
             await this.plugin.cacheOperation!.reopenTaskToCacheByID(e.objectId)
-            new Notice(`Task ${e.objectId} is reopend.`)
+            new Notice(`Task ${e.objectId} is reopened.`)
             processedEvents.push(e)
         }
 
@@ -678,31 +682,31 @@ export class TodoistSync  {
         // merge new events into existing events and save to JSON
         //const allEvents = [...savedEvents, ...unSynchronizedEvents]
         await this.plugin.cacheOperation!.appendEventsToCache(processedEvents)
-        this.plugin.saveSettings()
+        void this.plugin.saveSettings()
         } catch (error) {
         console.error('Error syncing task status:', error)
         }
     }
 
     // sync updated item status to Obsidian
-    async  syncUpdatedTaskToObsidian(unSynchronizedEvents: any[]) {
-        //console.log(unSynchronizedEvents) 
+    async  syncUpdatedTaskToObsidian(unSynchronizedEvents: SyncEvent[]) {
+        //console.debug(unSynchronizedEvents)
         try {
-        
+
         // process unsynced events and wait for all to complete
         const processedEvents = []
         for (const e of unSynchronizedEvents) {   //to execute completeTaskInTheFile(e.objectId) sequentially, replace Promise.allSettled() with a for...of loop to process unsynced events
-            //console.log(`syncing changes for ${e.objectId} to local`)
-            console.log(e)
-            console.log(typeof e.extraData.last_due_date === 'undefined')
+            //console.debug(`syncing changes for ${e.objectId} to local`)
+            console.debug(e)
+            console.debug(typeof e.extraData.last_due_date === 'undefined')
             if(!(typeof e.extraData.last_due_date === 'undefined')){
-                //console.log(`prepare update dueDate`)
+                //console.debug(`prepare update dueDate`)
                 await this.syncUpdatedTaskDueDateToObsidian(e)
 
             }
 
             if(!(typeof e.extraData.last_content === 'undefined')){
-                //console.log(`prepare update content`)
+                //console.debug(`prepare update content`)
                 await this.syncUpdatedTaskContentToObsidian(e)
             }
 
@@ -711,46 +715,46 @@ export class TodoistSync  {
             //new Notice(`Task ${e.objectId} is updated.`)
             processedEvents.push(e)
         }
-    
-    
-    
+
+
+
         // merge new events into existing events and save to JSON
         //const allEvents = [...savedEvents, ...unSynchronizedEvents]
         await this.plugin.cacheOperation!.appendEventsToCache(processedEvents)
-        this.plugin.saveSettings()
+        void this.plugin.saveSettings()
         } catch (error) {
         console.error('Error syncing updated item:', error)
         }
-        
+
     }
 
-    async syncUpdatedTaskContentToObsidian(e: any){
-        this.plugin.fileOperation!.syncUpdatedTaskContentToTheFile(e)
-        const content = e.extraData.content
+    async syncUpdatedTaskContentToObsidian(e: SyncEvent){
+        await this.plugin.fileOperation!.syncUpdatedTaskContentToTheFile(e)
+        const content = e.extraData.content as string
         this.plugin.cacheOperation!.modifyTaskToCacheByID(e.objectId,{content})
         new Notice(`The content of Task ${e.parentItemId} has been modified.`)
 
     }
 
-    async syncUpdatedTaskDueDateToObsidian(e: any){
-        this.plugin.fileOperation!.syncUpdatedTaskDueDateToTheFile(e)
+    async syncUpdatedTaskDueDateToObsidian(e: SyncEvent){
+        await this.plugin.fileOperation!.syncUpdatedTaskDueDateToTheFile(e)
         //update cache date, use todoist format
         const due = await this.plugin.todoistRestAPI!.getTaskDueById(e.objectId)
-        this.plugin.cacheOperation!.modifyTaskToCacheByID(e.objectId,{due} as any)
+        this.plugin.cacheOperation!.modifyTaskToCacheByID(e.objectId,{ due: due ?? undefined })
         new Notice(`The due date of Task ${e.parentItemId} has been modified.`)
 
     }
 
     // sync added task note to obsidian
-    async  syncAddedTaskNoteToObsidian(unSynchronizedEvents: any[]) {
+    async  syncAddedTaskNoteToObsidian(unSynchronizedEvents: SyncEvent[]) {
         // get unsynced events
-        //console.log(unSynchronizedEvents)
+        //console.debug(unSynchronizedEvents)
         try {
 
         // process unsynced events and wait for all to complete
         const processedEvents = []
         for (const e of unSynchronizedEvents) {   //to execute completeTaskInTheFile(e.objectId) sequentially, replace Promise.allSettled() with a for...of loop to process unsynced events
-            console.log(e)
+            console.debug(e)
             //const taskid = e.parentItemId
             //const note = e.extraData.content
             await this.plugin.fileOperation!.syncAddedTaskNoteToTheFile(e)
@@ -762,7 +766,7 @@ export class TodoistSync  {
         // merge new events into existing events and save to JSON
 
         await this.plugin.cacheOperation!.appendEventsToCache(processedEvents)
-        this.plugin.saveSettings()
+        void this.plugin.saveSettings()
         } catch (error) {
         console.error('Error syncing task status:', error)
         }
@@ -773,43 +777,43 @@ export class TodoistSync  {
         try{
             const all_activity_events = await this.plugin.todoistSyncAPI!.getNonObsidianAllActivityEvents()
             if(!all_activity_events){
-                console.log('No activity events returned')
+                console.debug('No activity events returned')
                 return
             }
 
             if(this.plugin.settings.debugMode){
-                console.log(`syncTodoistToObsidian: ${all_activity_events.length} activity events fetched`)
+                console.debug(`syncTodoistToObsidian: ${all_activity_events.length} activity events fetched`)
                 if(all_activity_events.length > 0){
-                    console.log('First event sample:', JSON.stringify(all_activity_events[0]))
+                    console.debug('First event sample:', JSON.stringify(all_activity_events[0]))
                 }
             }
 
             // remove synchonized events
             const savedEvents = await this.plugin.cacheOperation!.loadEventsFromCache()
             const result1 = all_activity_events.filter(
-            (objA: any) => !savedEvents.some((objB: any) => objB.id === objA.id)
+            (objA: SyncEvent) => !savedEvents.some((objB: SyncEvent) => objB.id === objA.id)
             )
 
             if(this.plugin.settings.debugMode){
-                console.log(`syncTodoistToObsidian: ${result1.length} new (unsynced) events after filtering ${savedEvents.length} cached events`)
+                console.debug(`syncTodoistToObsidian: ${result1.length} new (unsynced) events after filtering ${savedEvents.length} cached events`)
             }
 
             const savedTasks = await this.plugin.cacheOperation!.loadTasksFromCache()
             // find task activities where task id exists in Obsidian
             const result2 = result1.filter(
-            (objA: any) => savedTasks.some((objB: any) => objB.id === objA.objectId)
+            (objA: SyncEvent) => savedTasks.some((objB: TodoistTask) => objB.id === objA.objectId)
             )
 
             if(this.plugin.settings.debugMode){
-                console.log(`syncTodoistToObsidian: ${result2.length} events matching ${savedTasks.length} cached tasks`)
+                console.debug(`syncTodoistToObsidian: ${result2.length} events matching ${savedTasks.length} cached tasks`)
                 if(result1.length > 0 && result2.length === 0){
-                    console.log('Event objectIds:', result1.map((e: any) => e.objectId))
-                    console.log('Cached task ids:', savedTasks.map((t: any) => t.id))
+                    console.debug('Event objectIds:', result1.map((e: SyncEvent) => e.objectId))
+                    console.debug('Cached task ids:', savedTasks.map((t: TodoistTask) => t.id))
                 }
             }
             // find note activities where task id exists in Obsidian
             const result3 = result1.filter(
-                (objA: any) => savedTasks.some((objB: any) => objB.id === objA.parentItemId)
+                (objA: SyncEvent) => savedTasks.some((objB: TodoistTask) => objB.id === objA.parentItemId)
                 )
 
 
@@ -823,22 +827,22 @@ export class TodoistSync  {
 
             const unsynchronized_notes_added_events = this.plugin.todoistSyncAPI!.filterActivityEvents(result3, { eventType: 'added', objectType: 'comment' })
             const unsynchronized_project_events = this.plugin.todoistSyncAPI!.filterActivityEvents(result1, { objectType: 'project' })
-            console.log(unsynchronized_item_completed_events)
-            console.log(unsynchronized_item_uncompleted_events)
-            console.log(unsynchronized_item_updated_events)
-            console.log(unsynchronized_project_events) 
-            console.log(unsynchronized_notes_added_events)
-    
+            console.debug(unsynchronized_item_completed_events)
+            console.debug(unsynchronized_item_uncompleted_events)
+            console.debug(unsynchronized_item_updated_events)
+            console.debug(unsynchronized_project_events)
+            console.debug(unsynchronized_notes_added_events)
+
             await this.syncCompletedTaskStatusToObsidian(unsynchronized_item_completed_events)
             await this.syncUncompletedTaskStatusToObsidian(unsynchronized_item_uncompleted_events)
             await this.syncUpdatedTaskToObsidian(unsynchronized_item_updated_events)
             await this.syncAddedTaskNoteToObsidian(unsynchronized_notes_added_events)
             if(unsynchronized_project_events.length){
-                console.log('New project event')
+                console.debug('New project event')
                 await this.plugin.cacheOperation!.saveProjectsToCache()
                 await this.plugin.cacheOperation!.appendEventsToCache(unsynchronized_project_events)
             }
-    
+
 
         }catch (err){
             console.error('An error occurred while synchronizing:', err);
@@ -851,14 +855,14 @@ export class TodoistSync  {
     async  backupTodoistAllResources() {
         try {
         const resources = await this.plugin.todoistSyncAPI!.getAllResources()
-    
+
         const now: Date = new Date();
         const timeString: string = `${now.getFullYear()}${now.getMonth()+1}${now.getDate()}${now.getHours()}${now.getMinutes()}${now.getSeconds()}`;
-    
+
         const name = "todoist-backup-"+timeString+".json"
 
-        this.app.vault.create(name,JSON.stringify(resources))
-        //console.log(`todoist backup successful`)
+        await this.app.vault.create(name,JSON.stringify(resources))
+        //console.debug(`todoist backup successful`)
         new Notice(`Todoist backup data is saved in the path ${name}`)
         } catch (error) {
         console.error("An error occurred while creating Todoist backup:", error);
@@ -874,15 +878,14 @@ export class TodoistSync  {
             return
         }
         const description = this.plugin.taskParser!.getObsidianUrlFromFilepath(filepath)
-        let updatedContent: Record<string, any> = {}
+        const updatedContent: Record<string, unknown> = {}
         updatedContent.description = description
         try {
-            metadata.todoistTasks.forEach(async(taskId: any) => {
+            for (const taskId of metadata.todoistTasks) {
                 const updatedTask = await this.plugin.todoistRestAPI!.UpdateTask(taskId,updatedContent)
-                ;(updatedTask as any).path = filepath
-                this.plugin.cacheOperation!.updateTaskToCacheByID(updatedTask);
-
-        });
+                Object.assign(updatedTask, { path: filepath });
+                this.plugin.cacheOperation!.updateTaskToCacheByID(updatedTask as TodoistTask);
+            }
         } catch(error) {
             console.error('An error occurred in updateTaskDescription:', error);
         }
@@ -893,6 +896,6 @@ export class TodoistSync  {
 
 
 
-    
+
 
 }

@@ -1,9 +1,10 @@
 import { App} from 'obsidian';
 import UltimateTodoistSyncForObsidian from "../main";
+import { TodoistProject, TodoistTask, SyncEvent, FileMetadata } from './settings';
 
 interface Due {
     date?: string;
-    [key: string]: any; // allow for additional properties
+    [key: string]: unknown;
   }
 
 export class CacheOperation   {
@@ -16,25 +17,25 @@ export class CacheOperation   {
         this.plugin = plugin;
 	}
 
-          
-      
-      
-      
-    async getFileMetadata(filepath:string) {
+
+
+
+
+    getFileMetadata(filepath:string): FileMetadata | null {
         return this.plugin.settings.fileMetadata[filepath] ?? null
     }
 
-    async getFileMetadatas(){
+    getFileMetadatas(): Record<string, FileMetadata> | null {
         return this.plugin.settings.fileMetadata ?? null
     }
 
-    async newEmptyFileMetadata(filepath:string){
+    newEmptyFileMetadata(filepath:string): void {
         const metadatas = this.plugin.settings.fileMetadata
         if(metadatas[filepath]) {
             return
         }
         else{
-            metadatas[filepath] = {}
+            metadatas[filepath] = {} as FileMetadata
         }
         metadatas[filepath].todoistTasks = [];
         metadatas[filepath].todoistCount = 0;
@@ -43,78 +44,79 @@ export class CacheOperation   {
 
     }
 
-    async updateFileMetadata(filepath:string,newMetadata: any) {
+    updateFileMetadata(filepath:string, newMetadata: FileMetadata): void {
         const metadatas = this.plugin.settings.fileMetadata
-    
+
         // if metadata object doesn't exist, create a new one and add to metadatas
         if (!metadatas[filepath]) {
-            metadatas[filepath] = {}
+            metadatas[filepath] = {} as FileMetadata
         }
-    
+
         // update property values in metadata object
         metadatas[filepath].todoistTasks = newMetadata.todoistTasks;
         metadatas[filepath].todoistCount = newMetadata.todoistCount;
-    
+
         // save updated metadatas object back to settings
         this.plugin.settings.fileMetadata = metadatas
 
     }
 
-    async deleteTaskIdFromMetadata(filepath:string,taskId:string){
-        console.log(filepath)
-        const metadata = await this.getFileMetadata(filepath)
-        console.log(metadata)
-        const newTodoistTasks = metadata.todoistTasks.filter(function(element: any){
+    deleteTaskIdFromMetadata(filepath:string,taskId:string): void {
+        console.debug(filepath)
+        const metadata = this.getFileMetadata(filepath)
+        console.debug(metadata)
+        if (!metadata) {
+            return
+        }
+        const newTodoistTasks = metadata.todoistTasks.filter((element: string) => {
             return element !== taskId
         })
         const newTodoistCount = metadata.todoistCount - 1
-        let newMetadata: any = {}
-        newMetadata.todoistTasks = newTodoistTasks
-        newMetadata.todoistCount = newTodoistCount
-        console.log(`new metadata ${newMetadata}`)
-        
+        const newMetadata: FileMetadata = { todoistTasks: newTodoistTasks, todoistCount: newTodoistCount }
+        console.debug(`new metadata ${newMetadata}`)
+
 
     }
 
     //delete filepath from filemetadata
-    async deleteFilepathFromMetadata(filepath:string){
+    deleteFilepathFromMetadata(filepath:string): void {
         Reflect.deleteProperty(this.plugin.settings.fileMetadata, filepath);
-        this.plugin.saveSettings()
-        console.log(`${filepath} is deleted from file metadatas.`)
+        void this.plugin.saveSettings()
+        console.debug(`${filepath} is deleted from file metadatas.`)
     }
 
 
     //Check errors in filemata where the filepath is incorrect.
     async checkFileMetadata(){
-        const metadatas =  await this.getFileMetadatas()
+        const metadatas = this.getFileMetadatas()
         for (const key in metadatas) {
             let filepath = key
             const value = metadatas[key];
             let file = this.app.vault.getAbstractFileByPath(key)
             if(!file && (value.todoistTasks?.length === 0 || !value.todoistTasks)){
-                console.log(`${key} is not existed and metadata is empty.`)
-                await this.deleteFilepathFromMetadata(key)
+                console.debug(`${key} is not existed and metadata is empty.`)
+                this.deleteFilepathFromMetadata(key)
                 continue
             }
             if(value.todoistTasks?.length === 0 || !value.todoistTasks){
-                //todo 
+                //todo
                 //delelte empty metadata
                 continue
             }
             //check if file exist
-            
+
             if(!file){
                 //search new filepath
-                console.log(`file ${filepath} is not exist`) 
+                console.debug(`file ${filepath} is not exist`)
                 const todoistId1 = value.todoistTasks[0]
-                console.log(todoistId1)
+                console.debug(todoistId1)
                 const searchResult = await this.plugin.fileOperation!.searchFilepathsByTaskidInVault(todoistId1)
-                console.log(`new file path is`)
-                console.log(searchResult)
+                console.debug(`new file path is`)
+                console.debug(searchResult)
 
                 //update metadata
                 await this.updateRenamedFilePath(filepath,searchResult!)
-                this.plugin.saveSettings()
+                void this.plugin.saveSettings()
 
             }
 
@@ -131,7 +133,7 @@ export class CacheOperation   {
             });
             */
           }
-    
+
     }
 
     getDefaultProjectNameForFilepath(filepath:string){
@@ -161,10 +163,10 @@ export class CacheOperation   {
     setDefaultProjectIdForFilepath(filepath:string,defaultProjectId:string){
         const metadatas = this.plugin.settings.fileMetadata
         if (!metadatas[filepath]) {
-            metadatas[filepath] = {}
+            metadatas[filepath] = {} as FileMetadata
         }
         metadatas[filepath].defaultProjectId = defaultProjectId
-    
+
         // save updated metadatas object back to settings
         this.plugin.settings.fileMetadata = metadatas
 
@@ -181,24 +183,24 @@ export class CacheOperation   {
         return [];
     }
     }
-      
+
 
     // overwrite and save all tasks to cache
-    saveTasksToCache(newTasks: any) {
+    saveTasksToCache(newTasks: TodoistTask[]) {
         try {
             this.plugin.settings.todoistTasksData.tasks = newTasks
-            
+
         } catch (error) {
             console.error(`Error saving tasks to Cache: ${error}`);
             return false;
         }
     }
-      
-      
-      
-      
+
+
+
+
     // append event to cache
-    appendEventToCache(event:Object[]) {
+    appendEventToCache(event: SyncEvent) {
         try {
             this.plugin.settings.todoistTasksData.events.push(event)
         } catch (error) {
@@ -207,15 +209,15 @@ export class CacheOperation   {
     }
 
     // append events to cache
-    appendEventsToCache(events:Object[]) {
+    appendEventsToCache(events: SyncEvent[]) {
         try {
             this.plugin.settings.todoistTasksData.events.push(...events)
         } catch (error) {
             console.error(`Error append events to Cache: ${error}`);
         }
     }
-      
-      
+
+
     // load all events from cache
     loadEventsFromCache() {
     try {
@@ -228,52 +230,51 @@ export class CacheOperation   {
     }
 
 
-      
+
     // append to cache
-    appendTaskToCache(task: any) {
+    appendTaskToCache(task: TodoistTask) {
         try {
             if(task === null){
                 return
             }
-            const savedTasks = this.plugin.settings.todoistTasksData.tasks
             //const taskAlreadyExists = savedTasks.some((t) => t.id === task.id);
             //if (!taskAlreadyExists) {
              // When using the push method to insert a string into a cache object, it is treated as a simple key-value pair where the key is the array's numeric index and the value is the string itself. However, if you use push to insert another cache object (or array) into the cache object, that object becomes a nested child of the original cache object. In this case, the key is the numeric index and the value is the nested cache object itself.
             //}
-            this.plugin.settings.todoistTasksData.tasks.push(task);  
+            this.plugin.settings.todoistTasksData.tasks.push(task);
         } catch (error) {
             console.error(`Error appending task to Cache: ${error}`);
         }
     }
-      
-      
-      
-      
+
+
+
+
     //load task by specified id
-    loadTaskFromCacheyID(taskId: any) {
+    loadTaskFromCacheyID(taskId: string) {
         try {
 
             const savedTasks = this.plugin.settings.todoistTasksData.tasks
-            //console.log(savedTasks)
-            const savedTask = savedTasks.find((t: any) => t.id === taskId);
-            //console.log(savedTask)
+            //console.debug(savedTasks)
+            const savedTask = savedTasks.find((t: TodoistTask) => t.id === taskId);
+            //console.debug(savedTask)
             return(savedTask)
         } catch (error) {
             console.error(`Error finding task from Cache: ${error}`);
             return [];
         }
     }
-      
+
     //overwrite update task by specified id
-    updateTaskToCacheByID(task: any) {
+    updateTaskToCacheByID(task: TodoistTask) {
         try {
-        
-        
+
+
             //delete the old task
             this.deleteTaskFromCache(task.id)
             //add the new task
             this.appendTaskToCache(task)
-        
+
         } catch (error) {
             console.error(`Error updating task to Cache: ${error}`);
             return [];
@@ -287,15 +288,15 @@ export class CacheOperation   {
     modifyTaskToCacheByID(taskId: string, { content, due }: { content?: string, due?: Due }): void {
         try {
           const savedTasks = this.plugin.settings.todoistTasksData.tasks;
-          const taskIndex = savedTasks.findIndex((task: any) => task.id === taskId);
-      
+          const taskIndex = savedTasks.findIndex((task: TodoistTask) => task.id === taskId);
+
           if (taskIndex !== -1) {
             const updatedTask = { ...savedTasks[taskIndex] };
-            
+
             if (content !== undefined) {
               updatedTask.content = content;
             }
-      
+
             if (due !== undefined) {
               if (due === null) {
                 updatedTask.due = null;
@@ -303,9 +304,9 @@ export class CacheOperation   {
                 updatedTask.due = due;
               }
             }
-      
+
             savedTasks[taskIndex] = updatedTask;
-      
+
             this.plugin.settings.todoistTasksData.tasks = savedTasks;
           } else {
             throw new Error(`Task with ID ${taskId} not found in cache.`);
@@ -314,14 +315,14 @@ export class CacheOperation   {
           // Handle the error appropriately, e.g. by logging it or re-throwing it.
         }
       }
-      
-      
+
+
       //open a task status
     reopenTaskToCacheByID(taskId:string) {
         try {
             const savedTasks = this.plugin.settings.todoistTasksData.tasks
 
-        
+
             // iterate through array to find item with specified ID
             for (let i = 0; i < savedTasks.length; i++) {
             if (savedTasks[i].id === taskId) {
@@ -332,20 +333,20 @@ export class CacheOperation   {
             }
             }
             this.plugin.settings.todoistTasksData.tasks = savedTasks
-        
+
         } catch (error) {
             console.error(`Error open task to Cache file: ${error}`);
             return [];
         }
     }
-      
-      
-      
+
+
+
     //close a task status
     closeTaskToCacheByID(taskId:string):void {
         try {
             const savedTasks = this.plugin.settings.todoistTasksData.tasks
-        
+
             // iterate through array to find item with specified ID
             for (let i = 0; i < savedTasks.length; i++) {
             if (savedTasks[i].id === taskId) {
@@ -356,47 +357,47 @@ export class CacheOperation   {
             }
             }
             this.plugin.settings.todoistTasksData.tasks = savedTasks
-        
+
         } catch (error) {
             console.error(`Error close task to Cache file: ${error}`);
             throw error; // throw error so caller can catch and handle it
         }
     }
-      
-      
+
+
     // delete task by ID
-    deleteTaskFromCache(taskId: any) {
+    deleteTaskFromCache(taskId: string) {
         try {
         const savedTasks = this.plugin.settings.todoistTasksData.tasks
-        const newSavedTasks = savedTasks.filter((t: any) => t.id !== taskId);
+        const newSavedTasks = savedTasks.filter((t: TodoistTask) => t.id !== taskId);
 
-        this.plugin.settings.todoistTasksData.tasks = newSavedTasks                                         
+        this.plugin.settings.todoistTasksData.tasks = newSavedTasks
         } catch (error) {
         console.error(`Error deleting task from Cache file: ${error}`);
         }
     }
-      
-      
-      
-      
-      
+
+
+
+
+
     // delete tasks by ID array
-    deleteTaskFromCacheByIDs(deletedTaskIds: any) {
+    deleteTaskFromCacheByIDs(deletedTaskIds: string[]) {
         try {
             const savedTasks = this.plugin.settings.todoistTasksData.tasks
-            const newSavedTasks = savedTasks.filter((t: any) => !deletedTaskIds.includes(t.id))
+            const newSavedTasks = savedTasks.filter((t: TodoistTask) => !deletedTaskIds.includes(t.id))
             this.plugin.settings.todoistTasksData.tasks = newSavedTasks
         } catch (error) {
             console.error(`Error deleting task from Cache : ${error}`);
         }
     }
-      
-      
+
+
     //find project id by name
     getProjectIdByNameFromCache(projectName:string) {
         try {
         const savedProjects = this.plugin.settings.todoistTasksData.projects
-        const targetProject = savedProjects.find((obj: any) => obj.name === projectName);
+        const targetProject = savedProjects.find((obj: TodoistProject) => obj.name === projectName);
         const projectId = targetProject ? targetProject.id : null;
         return(projectId)
         } catch (error) {
@@ -406,11 +407,11 @@ export class CacheOperation   {
     }
 
 
-     
+
     getProjectNameByIdFromCache(projectId:string) {
         try {
         const savedProjects = this.plugin.settings.todoistTasksData.projects
-        const targetProject = savedProjects.find((obj: any) => obj.id === projectId);
+        const targetProject = savedProjects.find((obj: TodoistProject) => obj.id === projectId);
         const projectName = targetProject ? targetProject.name : null;
         return(projectName)
         } catch (error) {
@@ -418,7 +419,7 @@ export class CacheOperation   {
         return(false)
         }
     }
-      
+
 
 
     //save projects data to json file
@@ -429,36 +430,36 @@ export class CacheOperation   {
             if(!projects){
                 return false
             }
-        
+
             //save to json
             this.plugin.settings.todoistTasksData.projects = projects
 
             return true
 
         }catch(error){
+            console.debug(`error downloading projects: ${error}`)
             return false
-            console.log(`error downloading projects: ${error}`)
 
     }
-    
+
     }
 
 
     async updateRenamedFilePath(oldpath:string,newpath:string){
         try{
-            console.log(`oldpath is ${oldpath}`)
-            console.log(`newpath is ${newpath}`)
+            console.debug(`oldpath is ${oldpath}`)
+            console.debug(`newpath is ${newpath}`)
             const savedTask = await this.loadTasksFromCache()
-            //console.log(savedTask)
-            const newTasks = savedTask.map((obj: any) => {
+            //console.debug(savedTask)
+            const newTasks = savedTask.map((obj: TodoistTask) => {
                 if (obj.path === oldpath) {
                   return { ...obj, path: newpath };
                 }else {
                     return obj;
                 }
             })
-            //console.log(newTasks)
-            await this.saveTasksToCache(newTasks)
+            //console.debug(newTasks)
+            this.saveTasksToCache(newTasks)
 
             //update filepath
             const fileMetadatas = this.plugin.settings.fileMetadata
@@ -467,7 +468,7 @@ export class CacheOperation   {
             this.plugin.settings.fileMetadata = fileMetadatas
 
         }catch(error){
-            console.log(`Error updating renamed file path to cache: ${error}`)
+            console.debug(`Error updating renamed file path to cache: ${error}`)
         }
 
 

@@ -1,11 +1,51 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
 import UltimateTodoistSyncForObsidian from "../main";
 
-interface MyProject {
+export interface TodoistProject {
 	id: string;
 	name: string;
-  }
+	[key: string]: unknown;
+}
 
+export interface TodoistTask {
+	id: string;
+	content: string;
+	projectId: string;
+	description: string;
+	path?: string;
+	due?: { date: string; [key: string]: unknown } | null;
+	labels: string[];
+	isCompleted: boolean;
+	checked: boolean;
+	parentId?: string | null;
+	priority?: number;
+	url?: string;
+	[key: string]: unknown;
+}
+
+export interface SyncEvent {
+	id: string;
+	objectType: string;
+	objectId: string;
+	eventType: string;
+	eventDate: string;
+	parentProjectId: string;
+	parentItemId: string | null;
+	extraData: Record<string, unknown>;
+	[key: string]: unknown;
+}
+
+export interface TodoistTasksData {
+	projects: TodoistProject[];
+	tasks: TodoistTask[];
+	events: SyncEvent[];
+}
+
+export interface FileMetadata {
+	todoistTasks: string[];
+	todoistCount: number;
+	defaultProjectId?: string;
+}
 
 export interface UltimateTodoistSyncSettings {
     initialized:boolean;
@@ -15,11 +55,11 @@ export interface UltimateTodoistSyncSettings {
 	apiInitialized:boolean;
 	defaultProjectName: string;
 	defaultProjectId:string;
-	automaticSynchronizationInterval:Number;
-	todoistTasksData:any;
-	fileMetadata:any;
+	automaticSynchronizationInterval:number;
+	todoistTasksData:TodoistTasksData;
+	fileMetadata:Record<string, FileMetadata>;
 	enableFullVaultSync: boolean;
-	statistics: any;
+	statistics: Record<string, unknown>;
 	debugMode:boolean;
 	useAppURI:boolean;
 }
@@ -57,52 +97,52 @@ export class UltimateTodoistSyncSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: 'Settings for Ultimate Todoist Sync: Reborn.' });
+		new Setting(containerEl).setName('Settings for Ultimate Todoist Sync: Reborn').setHeading();
 
-		const myProjectsOptions: Record<string, string> = this.plugin.settings.todoistTasksData?.projects?.reduce((obj: Record<string, string>, item: any) => {
+		const myProjectsOptions: Record<string, string> = this.plugin.settings.todoistTasksData?.projects?.reduce((obj: Record<string, string>, item: TodoistProject) => {
 			obj[(item.id).toString()] = item.name;
 			return obj;
-		  }, {} as Record<string, string>);	  
+		  }, {} as Record<string, string>);
 
 		new Setting(containerEl)
 			.setName('Todoist API')
-			.setDesc('Please enter todoist api token and click the paper airplane button to submit.')
+			.setDesc('Please enter Todoist API token and click the paper airplane button to submit.')
 			.addText((text) =>
 				text
 					.setPlaceholder('Enter your API')
 					.setValue(this.plugin.settings.todoistAPIToken)
-					.onChange(async (value) => {
+					.onChange((value) => {
 						this.plugin.settings.todoistAPIToken = value;
 						this.plugin.settings.apiInitialized = false;
 						//
 					})
-	
+
 			)
 			.addExtraButton((button) => {
 				button.setIcon('send')
 					.onClick(async () => {
 							await this.plugin.modifyTodoistAPI(this.plugin.settings.todoistAPIToken)
 							this.display()
-							
+
 						})
-					
-					
+
+
 			})
 
-			
+
 
 
 		new Setting(containerEl)
-		.setName('Automatic Sync Interval Time')
+		.setName('Automatic sync interval time')
 		.setDesc('Please specify the desired interval time, with seconds as the default unit. The default setting is 300 seconds, which corresponds to syncing once every 5 minutes. You can customize it, but it cannot be lower than 20 seconds.')
 		.addText((text) =>
 			text
 				.setPlaceholder('Sync interval')
 				.setValue(this.plugin.settings.automaticSynchronizationInterval.toString())
-				.onChange(async (value) => {
+				.onChange((value) => {
 					const intervalNum = Number(value)
 					if(isNaN(intervalNum)){
-						new Notice(`Wrong type,please enter a number.`)
+						new Notice(`Wrong type, please enter a number.`)
 						return
 					}
 					if(intervalNum < 20 ){
@@ -114,7 +154,7 @@ export class UltimateTodoistSyncSettingTab extends PluginSettingTab {
 						return;
 					}
 					this.plugin.settings.automaticSynchronizationInterval = intervalNum;
-					this.plugin.saveSettings()
+					void this.plugin.saveSettings()
 					new Notice('Settings have been updated.');
 					//
 				})
@@ -152,74 +192,74 @@ export class UltimateTodoistSyncSettingTab extends PluginSettingTab {
 		*/
 
 		new Setting(containerEl)
-			.setName('Default Project')
+			.setName('Default project')
 			.setDesc('New tasks are automatically synced to the default project. You can modify the project here.')
-			.addDropdown(component => 
+			.addDropdown(component =>
 				component
 						.addOption(this.plugin.settings.defaultProjectId,this.plugin.settings.defaultProjectName)
 						.addOptions(myProjectsOptions)
 						.onChange((value)=>{
 							this.plugin.settings.defaultProjectId = value
 							this.plugin.settings.defaultProjectName = this.plugin.cacheOperation!.getProjectNameByIdFromCache(value)
-							this.plugin.saveSettings()
-							
-							
+							void this.plugin.saveSettings()
+
+
 						})
-						
+
 				)
 
 
-		
+
 		new Setting(containerEl)
-			.setName('Full Vault Sync')
+			.setName('Full vault sync')
 			.setDesc('By default, only tasks marked with #todoist are synchronized. If this option is turned on, all tasks in the vault will be synchronized.')
-			.addToggle(component => 
+			.addToggle(component =>
 				component
 						.setValue(this.plugin.settings.enableFullVaultSync)
 						.onChange((value)=>{
 							this.plugin.settings.enableFullVaultSync = value
-							this.plugin.saveSettings()
-							new Notice("Full vault sync is enabled.")							
+							void this.plugin.saveSettings()
+							new Notice("Full vault sync is enabled.")
 						})
-						
-				)						
+
+				)
 
 
 
 		new Setting(containerEl)
-		.setName('Manual Sync')
+		.setName('Manual sync')
 		.setDesc('Manually perform a synchronization task.')
 		.addButton(button => button
 			.setButtonText('Sync')
 			.onClick(async () => {
 				// Add code here to handle exporting Todoist data
 				if(!this.plugin.settings.apiInitialized){
-					new Notice(`Please set the todoist api first`)
+					new Notice(`Please set the Todoist API first`)
 					return
 				}
 				try{
 					await this.plugin.scheduledSynchronization()
 					this.plugin.syncLock = false
-					new Notice(`Sync completed..`)
+					new Notice(`Sync completed.`)
 				}catch(error){
-					new Notice(`An error occurred while syncing.:${error}`)
+					new Notice(`An error occurred while syncing: ${error}`)
 					this.plugin.syncLock = false
 				}
 
 			})
-		);				
+		);
 
 
 
 		new Setting(containerEl)
-		.setName('Check Database')
+		.setName('Check database')
 		.setDesc('Check for possible issues: sync error, file renaming not updated, or missed tasks not synchronized.')
 		.addButton(button => button
-			.setButtonText('Check Database')
+			.setButtonText('Check database')
 			.onClick(async () => {
 				// Add code here to handle exporting Todoist data
 				if(!this.plugin.settings.apiInitialized){
-					new Notice(`Please set the todoist api first`)
+					new Notice(`Please set the Todoist API first`)
 					return
 				}
 
@@ -228,55 +268,55 @@ export class UltimateTodoistSyncSettingTab extends PluginSettingTab {
 
 
 				//check file metadata
-				console.log('checking file metadata')
+				console.debug('checking file metadata')
 				await this.plugin.cacheOperation!.checkFileMetadata()
-				this.plugin.saveSettings()
+				void this.plugin.saveSettings()
 				const metadatas = await this.plugin.cacheOperation!.getFileMetadatas()
 				// check default project task amounts
 				try{
 					const projectId = this.plugin.settings.defaultProjectId
-					let options: any = {}
+					const options: { projectId?: string } = {}
 					options.projectId = projectId
 					const tasks = await this.plugin.todoistRestAPI!.GetActiveTasks(options)
-					let length = tasks.length
+					const length = tasks.length
 					if(length >= 300){
 						new Notice(`The number of tasks in the default project exceeds 300, reaching the upper limit. It is not possible to add more tasks. Please modify the default project.`)
 					}
 					//console.log(tasks)
 
 				}catch(error){
-					console.error(`An error occurred while get tasks from todoist: ${error.message}`);
+					console.error(`An error occurred while get tasks from todoist: ${(error as Error).message}`);
 				}
 
 				if (!await this.plugin.checkAndHandleSyncLock()) return;
 
 
 
-				console.log('checking deleted tasks')
-				//check empty task				
+				console.debug('checking deleted tasks')
+				//check empty task
 				for (const key in metadatas) {
 					const value = metadatas[key];
 					//console.log(value)
 					for(const taskId of value.todoistTasks) {
-						
+
 						//console.log(`${taskId}`)
 						let taskObject
 
 						try{
 							taskObject = await this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
 						}catch(error){
-							console.error(`An error occurred while loading task cache: ${error.message}`);
+							console.error(`An error occurred while loading task cache: ${(error as Error).message}`);
 						}
 
 						if(!taskObject){
-							console.log(`The task data of the ${taskId} is empty.`)
-							//get from todoist 
+							console.debug(`The task data of the ${taskId} is empty.`)
+							//get from todoist
 							try {
 								taskObject = await this.plugin.todoistRestAPI!.getTaskById(taskId);
 							  } catch (error) {
-								if (error.message.includes('404')) {
+								if ((error as Error).message.includes('404')) {
 								  // handle 404 error
-								  console.log(`Task ${taskId} seems to not exist.`);
+								  console.debug(`Task ${taskId} seems to not exist.`);
 								  await this.plugin.cacheOperation!.deleteTaskIdFromMetadata(key,taskId)
 								  continue
 								} else {
@@ -286,14 +326,14 @@ export class UltimateTodoistSyncSettingTab extends PluginSettingTab {
 								}
 							  }
 
-						}									
+						}
 					};
 
 				  }
-				  this.plugin.saveSettings()
+				  void this.plugin.saveSettings()
 
 
-				console.log('checking renamed files')
+				console.debug('checking renamed files')
 				try{
 					//check renamed files
 					for (const key in metadatas) {
@@ -301,65 +341,60 @@ export class UltimateTodoistSyncSettingTab extends PluginSettingTab {
 						//console.log(value)
 						const newDescription = this.plugin.taskParser!.getObsidianUrlFromFilepath(key)
 						for(const taskId of value.todoistTasks) {
-							
+
 							//console.log(`${taskId}`)
 							let taskObject
 							try{
 								taskObject = await this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
 							}catch(error){
-								console.error(`An error occurred while loading task ${taskId} from cache: ${error.message}`);
-								console.log(taskObject)
+								console.error(`An error occurred while loading task ${taskId} from cache: ${(error as Error).message}`);
+								console.debug(taskObject)
 							}
 							if(!taskObject){
-								console.log(`Task ${taskId} seems to not exist.`)
+								console.debug(`Task ${taskId} seems to not exist.`)
 								continue
 							}
 							if(!taskObject?.description){
-								console.log(`The description of the task ${taskId} is empty.`)
-							}							
+								console.debug(`The description of the task ${taskId} is empty.`)
+							}
 							const oldDescription = taskObject?.description ?? '';
 							if(newDescription != oldDescription){
-								console.log('Preparing to update description.')
-								console.log(oldDescription)
-								console.log(newDescription)
+								console.debug('Preparing to update description.')
+								console.debug(oldDescription)
+								console.debug(newDescription)
 								try{
 									//await this.plugin.todoistSync.updateTaskDescription(key)
 								}catch(error){
-									console.error(`An error occurred while updating task discription: ${error.message}`);
+									console.error(`An error occurred while updating task discription: ${(error as Error).message}`);
 								}
 
 							}
-			
+
 						};
 
 					  }
 
 					//check empty file metadata
-					
+
 					//check calendar format
 
 
-					
+
 					//check omitted tasks
-					console.log('checking unsynced tasks')
+					console.debug('checking unsynced tasks')
 					const files = this.app.vault.getFiles()
-					files.forEach(async (v, i) => {
-						if(v.extension == "md"){
-							try{
-								//console.log(`Scanning file ${v.path}`)
+					for (const v of files) {
+						if (v.extension === "md") {
+							try {
 								await this.plugin.fileOperation!.addTodoistLinkToFile(v.path)
-								if(this.plugin.settings.enableFullVaultSync){
+								if (this.plugin.settings.enableFullVaultSync) {
 									await this.plugin.fileOperation!.addTodoistTagToFile(v.path)
 								}
-
-								
-							}catch(error){
-								console.error(`An error occurred while check new tasks in the file: ${v.path}, ${error.message}`);
-								
+							} catch (error) {
+								console.error(`An error occurred while check new tasks in the file: ${v.path}, ${(error as Error).message}`)
 							}
-
 						}
-					});
+					}
 					this.plugin.syncLock = false
 					new Notice(`All files have been scanned.`)
 				}catch(error){
@@ -371,45 +406,44 @@ export class UltimateTodoistSyncSettingTab extends PluginSettingTab {
 		);
 
 		new Setting(containerEl)
-			.setName('Debug Mode')
+			.setName('Debug mode')
 			.setDesc('After enabling this option, all log information will be output to the console, which can help check for errors.')
-			.addToggle(component => 
+			.addToggle(component =>
 				component
 						.setValue(this.plugin.settings.debugMode)
 						.onChange((value)=>{
 							this.plugin.settings.debugMode = value
-							this.plugin.saveSettings()						
+							void this.plugin.saveSettings()
 						})
-						
+
 				)
 
 		new Setting(containerEl)
-			.setName('Backup Todoist Data')
-			.setDesc('Click to backup Todoist data, The backed-up files will be stored in the root directory of the Obsidian vault.')
+			.setName('Backup Todoist data')
+			.setDesc('Click to backup Todoist data, the backed-up files will be stored in the root directory of the Obsidian vault.')
 			.addButton(button => button
 				.setButtonText('Backup')
 				.onClick(() => {
 					// Add code here to handle exporting Todoist data
 					if(!this.plugin.settings.apiInitialized){
-						new Notice(`Please set the todoist api first`)
+						new Notice(`Please set the Todoist API first`)
 						return
 					}
-					this.plugin.todoistSync!.backupTodoistAllResources()
+					void this.plugin.todoistSync!.backupTodoistAllResources()
 				})
 			);
 
 		new Setting(containerEl)
-			.setName('Use Desktop URIs')
+			.setName('Use desktop URIs')
 			.setDesc('If enabled produces application URI links (todoist://...) instead of web urls (https://...), which open in the app instead of the browser')
-			.addToggle(component => 
+			.addToggle(component =>
 				component
 						.setValue(this.plugin.settings.useAppURI)
 						.onChange((value)=>{
 							this.plugin.settings.useAppURI = value
-							this.plugin.saveSettings()						
+							void this.plugin.saveSettings()
 						})
-						
+
 				)
 	}
 }
-

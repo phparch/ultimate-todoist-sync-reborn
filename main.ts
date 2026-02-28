@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, Plugin ,Editor, WorkspaceLeaf} from 'obsidian';
+import { MarkdownView, Notice, Plugin, Editor } from 'obsidian';
 
 
 //settings
@@ -6,7 +6,7 @@ import { UltimateTodoistSyncSettings,DEFAULT_SETTINGS,UltimateTodoistSyncSetting
 //todoist  api
 import { TodoistRestAPI } from './src/todoistRestAPI';
 import { TodoistSyncAPI } from './src/todoistSyncAPI';
-//task parser 
+//task parser
 import { TaskParser } from './src/taskParser';
 //cache task read and write
 import { CacheOperation } from './src/cacheOperation';
@@ -29,22 +29,22 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
     fileOperation: FileOperation | undefined;
     todoistSync: TodoistSync | undefined;
 	lastLines: Map<string,number>;
-	statusBar: any;
-	syncLock: Boolean;
+	statusBar: HTMLElement;
+	syncLock: boolean;
 
 	async onload() {
 
 		const isSettingsLoaded = await this.loadSettings();
 
 		if(!isSettingsLoaded){
-			new Notice('Settings failed to load.Please reload the ultimate todoist sync plugin.');
+			new Notice('Settings failed to load. Please reload the ultimate todoist sync plugin.');
 			return;
 		}
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new UltimateTodoistSyncSettingTab(this.app, this));
 		if (!this.settings.todoistAPIToken) {
 			new Notice('Please enter your Todoist API.');
-			//return	   
+			//return
 		}else{
 			await this.initializePlugin();
 		}
@@ -58,28 +58,25 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 
 
 
-
 		//key event listener for line changes and deletions
 		this.registerDomEvent(document, 'keyup', async (evt: KeyboardEvent) =>{
 			if(!this.settings.apiInitialized){
 				return
 			}
 			//console.log(`key pressed`)
-			
+
 			//check if the event occurs in the editor area, if not return
 			if (!(this.app.workspace.activeEditor?.editor?.hasFocus())) {
-				(console.log(`editor is not focused`))
+				(console.debug(`editor is not focused`))
 				return
 			}
-			const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-			const editor = view?.app.workspace.activeEditor?.editor
-	
+
 			if (evt.key === 'ArrowUp' || evt.key === 'ArrowDown' || evt.key === 'ArrowLeft' || evt.key === 'ArrowRight' ||evt.key === 'PageUp' || evt.key === 'PageDown') {
 				//console.log(`${evt.key} arrow key is released`);
 				if(!( this.checkModuleClass())){
 					return
 				}
-				this.lineNumberCheck()
+				void this.lineNumberCheck()
 			}
 			if(evt.key === "Delete" || evt.key === "Backspace"){
 				try{
@@ -92,27 +89,25 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 					if (!activeFilePath) return;
 					await this.todoistSync!.deletedTaskCheck(activeFilePath);
 					this.syncLock = false;
-					this.saveSettings()	
+					void this.saveSettings()
 				}catch(error){
 					console.error(`An error occurred while deleting tasks: ${error}`);
 					this.syncLock = false
 				}
-	
+
 			}
 		});
 
 		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
 		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', async (evt: MouseEvent) => {
+		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
 			if(!this.settings.apiInitialized){
 				return
 			}
 			//console.log('click', evt);
 			if (this.app.workspace.activeEditor?.editor?.hasFocus()) {
 				//console.log('Click event: editor is focused');
-				const view = this.app.workspace.getActiveViewOfType(MarkdownView)
-				const editor = this.app.workspace.activeEditor?.editor
-				this.lineNumberCheck()
+				void this.lineNumberCheck()
 			}
 			else{
 				//
@@ -124,7 +119,7 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 				if(!(this.checkModuleClass())){
 					return
 				}
-				this.checkboxEventhandle(evt)
+				void this.checkboxEventhandle(evt)
 				//this.todoistSync.fullTextModifiedTaskCheck()
 
 			}
@@ -137,24 +132,24 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 		this.registerEvent(this.app.workspace.on('editor-change',async (editor,view:MarkdownView)=>{
 			try{
 				if(!this.settings.apiInitialized){
-					if(this.settings.debugMode) console.log('editor-change: apiInitialized is false')
+					if(this.settings.debugMode) console.debug('editor-change: apiInitialized is false')
 					return
 				}
 
-				this.lineNumberCheck()
+				void this.lineNumberCheck()
 				if(!(this.checkModuleClass())){
-					if(this.settings.debugMode) console.log('editor-change: checkModuleClass failed')
+					if(this.settings.debugMode) console.debug('editor-change: checkModuleClass failed')
 					return
 				}
 				if(this.settings.enableFullVaultSync){
-					if(this.settings.debugMode) console.log('editor-change: skipping (fullVaultSync enabled)')
+					if(this.settings.debugMode) console.debug('editor-change: skipping (fullVaultSync enabled)')
 					return
 				}
 				if (!await this.checkAndHandleSyncLock()) return;
-				if(this.settings.debugMode) console.log('editor-change: calling lineContentNewTaskCheck')
+				if(this.settings.debugMode) console.debug('editor-change: calling lineContentNewTaskCheck')
 				await this.todoistSync!.lineContentNewTaskCheck(editor,view)
 				this.syncLock = false
-				this.saveSettings()
+				void this.saveSettings()
 
 			}catch(error){
 				console.error(`An error occurred while check new task in line: ${error.message}`);
@@ -205,11 +200,11 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 			if(!this.settings.apiInitialized){
 				return
 			}
-			console.log(`${oldpath} is renamed`)
+			console.debug(`${oldpath} is renamed`)
 			//read frontMatter
 			//const frontMatter = await this.fileOperation.getFrontMatter(file)
 			const frontMatter =  await this.cacheOperation!.getFileMetadata(oldpath)
-			console.log(frontMatter)
+			console.debug(frontMatter)
 			if(frontMatter === null || frontMatter.todoistTasks === undefined){
 				//console.log('No tasks in the deleted file')
 				return
@@ -218,8 +213,8 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 					return
 				}
 			await this.cacheOperation!.updateRenamedFilePath(oldpath,file.path)
-			this.saveSettings()
-			
+			void this.saveSettings()
+
 			//update task description
 			if (!await this.checkAndHandleSyncLock()) return;
 			try {
@@ -239,13 +234,13 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 					return
 				}
 				const filepath = file.path
-				console.log(`${filepath} is modified`)
+				console.debug(`${filepath} is modified`)
 
 				//get current view
-				
+
 				const activateFile = this.app.workspace.getActiveFile()
 
-				console.log(activateFile?.path)
+				console.debug(activateFile?.path)
 
 				//To avoid conflicts, Do not check files being edited
 				if(activateFile?.path == filepath){
@@ -253,21 +248,21 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 				}
 
 				if (!await this.checkAndHandleSyncLock()) return;
-				
+
 				await this.todoistSync!.fullTextNewTaskCheck(filepath)
 				this.syncLock = false;
 			} catch(error) {
 				console.error(`An error occurred while modifying the file: ${error.message}`);
 				this.syncLock = false
-				// You can add further error handling logic here. For example, you may want to 
+				// You can add further error handling logic here. For example, you may want to
 				// revert certain operations, or alert the user about the error.
 			}
 		}));
 
-		this.registerInterval(window.setInterval(async () => await this.scheduledSynchronization(), Number(this.settings.automaticSynchronizationInterval) * 1000));
+		this.registerInterval(window.setInterval(() => { void this.scheduledSynchronization(); }, Number(this.settings.automaticSynchronizationInterval) * 1000));
 
 		this.app.workspace.on('active-leaf-change',(leaf)=>{
-			this.setStatusBarText()
+			void this.setStatusBarText()
 		})
 
 
@@ -275,14 +270,14 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 		// This adds an editor command that can perform some operation on the current editor instance
 		this.addCommand({
 			id: 'set-default-project-for-todoist-task-in-the-current-file',
-			name: 'Set default project for todoist task in the current file',
+			name: 'Set default project for Todoist task in the current file',
 			editorCallback: (editor: Editor, view: MarkdownView) => {
 				if(!view){
 					return
 				}
 				const filepath = view.file!.path
 				new SetDefalutProjectInTheFilepathModal(this.app,this,filepath)
-				
+
 			}
 		});
 
@@ -294,9 +289,9 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 	}
 
 
-	async onunload() {
-		console.log(`Ultimate Todoist Sync: Reborn is unloaded!`)
-		await this.saveSettings()
+	onunload() {
+		console.debug(`Ultimate Todoist Sync: Reborn is unloaded!`)
+		void this.saveSettings()
 
 	}
 
@@ -326,13 +321,13 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 	}
 
 	async modifyTodoistAPI(api:string){
-		await this.initializePlugin() 
+		await this.initializePlugin()
 	}
 
 	// return true of false
 	async initializePlugin(){
-		
-		//initialize todoist restapi 
+
+		//initialize todoist restapi
 		this.todoistRestAPI = new TodoistRestAPI(this.app, this)
 
 		//initialize data read and write object
@@ -349,8 +344,8 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 			this.cacheOperation = undefined
 			this.fileOperation = undefined
 			this.todoistSync = undefined
-			new Notice(`Ultimate Todoist Sync: Reborn plugin initialization failed, please check the todoist api`)
-			return;		
+			new Notice(`Ultimate Todoist Sync: Reborn plugin initialization failed, please check the Todoist API`)
+			return;
 		}
 
 		if(!this.settings.initialized){
@@ -362,26 +357,26 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 
 				//initialize file operation
 				this.fileOperation = new FileOperation(this.app,this)
-		
+
 				//initialize todoisy sync api
 				this.todoistSyncAPI = new TodoistSyncAPI(this.app,this)
-		
+
 				//initialize todoist sync module
 				this.todoistSync = new TodoistSync(this.app,this)
-		
+
 				//backup all data before each startup
-				this.todoistSync.backupTodoistAllResources()
+				void this.todoistSync.backupTodoistAllResources()
 
 			}catch(error){
-				console.log(`error creating user data folder: ${error}`)
-				new Notice(`error creating user data folder`)
+				console.error(`error creating user data folder: ${error}`)
+				new Notice(`Error creating user data folder`)
 				return;
 			}
 
 
 			//initialize settings
 			this.settings.initialized = true
-			this.saveSettings()
+			void this.saveSettings()
 			new Notice(`Ultimate Todoist Sync: Reborn initialization successful. Todoist data has been backed up.`)
 
 		}
@@ -393,10 +388,10 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 		if(!this.settings.defaultProjectId){
 			const projects = this.settings.todoistTasksData?.projects
 			if(projects && projects.length > 0){
-				const inbox = projects.find((p: any) => p.name === 'Inbox') || projects[0]
+				const inbox = projects.find((p) => p.name === 'Inbox') || projects[0]
 				this.settings.defaultProjectId = inbox.id
 				this.settings.defaultProjectName = inbox.name
-				this.saveSettings()
+				void this.saveSettings()
 			}
 		}
 
@@ -406,14 +401,14 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 		this.syncLock = false
 		new Notice(`Ultimate Todoist Sync: Reborn loaded successfully.`)
 		return true
-		
+
 
 
 	}
 
-	async initializeModuleClass(){
+	initializeModuleClass(){
 
-		//initialize todoist restapi 
+		//initialize todoist restapi
 		this.todoistRestAPI = new TodoistRestAPI(this.app,this)
 
 		//initialize data read and write object
@@ -453,7 +448,7 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 			if(this.lastLines.has(fileName as string) && line !== this.lastLines.get(fileName as string)){
 				const lastLine = this.lastLines.get(fileName as string)
 				if(this.settings.debugMode){
-					console.log('Line changed!', `current line is ${line}`, `last line is ${lastLine}`);
+					console.debug('Line changed!', `current line is ${line}`, `last line is ${lastLine}`);
 				}
 
 
@@ -474,16 +469,16 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 				}
 
 
-				
+
 			}
 			else  {
-				//console.log('Line not changed');				
+				//console.log('Line not changed');
 			}
 
 		}
 
 
-		
+
 
 	}
 
@@ -503,9 +498,9 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 			//console.log(taskId)
 			//const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 			if (target.checked) {
-				this.todoistSync!.closeTask(taskId);
+				void this.todoistSync!.closeTask(taskId);
 			} else {
-				this.todoistSync!.repoenTask(taskId);
+				void this.todoistSync!.repoenTask(taskId);
 			}
 		} else {
 			//console.log('todoist_id not found');
@@ -533,14 +528,14 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 			return true
 		}
 		else{
-			new Notice(`Please enter the correct Todoist API token"`)
+			new Notice(`Please enter the correct Todoist API token.`)
 			return(false)
 		}
-		
+
 
 	}
 
-	async setStatusBarText(){
+	setStatusBarText(){
 		if(!( this.checkModuleClass())){
 			return
 		}
@@ -551,12 +546,12 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 		else{
 			const filepath = this.app.workspace.getActiveViewOfType(MarkdownView)?.file?.path
 			if(filepath === undefined){
-				console.log(`file path undefined`)
+				console.debug(`file path undefined`)
 				return
 			}
-			const defaultProjectName = await this.cacheOperation!.getDefaultProjectNameForFilepath(filepath as string)
-			if(defaultProjectName === undefined){
-				console.log(`projectName undefined`)
+			const defaultProjectName = this.cacheOperation!.getDefaultProjectNameForFilepath(filepath)
+			if(!defaultProjectName){
+				console.debug(`projectName undefined`)
 				return
 			}
 			this.statusBar.setText(defaultProjectName)
@@ -568,7 +563,7 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 		if (!(this.checkModuleClass())) {
 			return;
 		}
-		console.log("Todoist scheduled synchronization task started at", new Date().toLocaleString());
+		console.debug("Todoist scheduled synchronization task started at", new Date().toLocaleString());
 		try {
 			if (!await this.checkAndHandleSyncLock()) return;
 			try {
@@ -588,12 +583,12 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 
 			const filesToSync = this.settings.fileMetadata;
 			if(this.settings.debugMode){
-				console.log(filesToSync)
+				console.debug(filesToSync)
 			}
 
 			for (let fileKey in filesToSync) {
 				if(this.settings.debugMode){
-					console.log(fileKey)
+					console.debug(fileKey)
 				}
 
 				if (!await this.checkAndHandleSyncLock()) return;
@@ -623,10 +618,10 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 
 		} catch (error) {
 			console.error('An error occurred:', error);
-			new Notice('An error occurred:', error);
+			new Notice(`An error occurred: ${error}`);
 			this.syncLock = false;
 		}
-		console.log("Todoist scheduled synchronization task completed at", new Date().toLocaleString());
+		console.debug("Todoist scheduled synchronization task completed at", new Date().toLocaleString());
 	}
 
 	async checkSyncLock() {
@@ -643,12 +638,12 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 
 	async checkAndHandleSyncLock() {
 		if (this.syncLock) {
-			console.log('sync locked.');
+			console.debug('sync locked.');
 			const isSyncLockChecked = await this.checkSyncLock();
 			if (!isSyncLockChecked) {
 				return false;
 			}
-			console.log('sync unlocked.')
+			console.debug('sync unlocked.')
 		}
 		this.syncLock = true;
 		return true;

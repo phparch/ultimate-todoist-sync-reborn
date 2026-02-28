@@ -13,7 +13,7 @@ type Event = {
   parentProjectId: string;
   parentItemId: string | null;
   initiatorId: string | null;
-  extraData: Record<string, any>;
+  extraData: Record<string, unknown>;
 };
 
 type FilterOptions = {
@@ -33,7 +33,7 @@ export class TodoistSyncAPI   {
 
     initializeAPI(){
         const token = this.plugin.settings.todoistAPIToken
-        const api = new TodoistApi(token, { customFetch: obsidianFetch } as any)
+        const api = new TodoistApi(token, { customFetch: obsidianFetch as unknown as typeof fetch })
         return api
     }
 
@@ -62,7 +62,7 @@ export class TodoistSyncAPI   {
       }
 
       return response.json;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
       throw new Error('Failed to fetch all resources due to network error');
     }
@@ -93,9 +93,9 @@ export class TodoistSyncAPI   {
         }
 
         const data = response.json;
-        console.log(data)
+        console.debug(data)
         return data;
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(error);
         throw new Error('Failed to fetch user resources due to network error');
       }
@@ -133,9 +133,9 @@ export class TodoistSyncAPI   {
           }
 
           const data = response.json;
-          console.log(data)
+          console.debug(data)
           return data;
-        } catch (error) {
+        } catch (error: unknown) {
           console.error(error);
           throw new Error('Failed to fetch user resources due to network error');
         }
@@ -144,29 +144,19 @@ export class TodoistSyncAPI   {
     //get activity logs using the SDK (v1 API uses GET, not POST)
     async getAllActivityEvents() {
       const api = this.initializeAPI()
-      try {
-        const response = await api.getActivityLogs({})
-        return response.results || []
-      } catch (error) {
-        throw error;
-      }
+      const response = await api.getActivityLogs({})
+      return response.results || []
     }
 
     async getNonObsidianAllActivityEvents() {
-      try{
         const allActivityEvents = await this.getAllActivityEvents()
         //exclude activity from Obsidian client
-        const filteredArray = allActivityEvents.filter((obj: any) => !obj.extraData?.client?.includes("obsidian"));
-        return(filteredArray)
-
-      }catch(err){
-        console.error('An error occurred:', err);
-      }
-
+        const filteredArray = allActivityEvents.filter((obj: Event) => !obj.extraData?.client?.includes("obsidian"));
+        return filteredArray
     }
 
 
-    filterActivityEvents(events: any[], options: FilterOptions): any[] {
+    filterActivityEvents(events: Event[], options: FilterOptions): Event[] {
       return events.filter(event =>
         (options.eventType ? event.eventType === options.eventType : true) &&
         (options.objectType ? event.objectType === options.objectType : true)
@@ -180,7 +170,7 @@ export class TodoistSyncAPI   {
         try {
             const response = await api.getActivityLogs({ objectType: 'task', eventType: 'completed' })
             return response.results || []
-        } catch (error) {
+        } catch (error: unknown) {
             console.error(error);
             throw new Error('Failed to fetch completed items due to network error');
         }
@@ -194,7 +184,7 @@ export class TodoistSyncAPI   {
         try {
             const response = await api.getActivityLogs({ objectType: 'task', eventType: 'uncompleted' })
             return response.results || []
-        } catch (error) {
+        } catch (error: unknown) {
             console.error(error);
             throw new Error('Failed to fetch uncompleted items due to network error');
         }
@@ -205,7 +195,7 @@ export class TodoistSyncAPI   {
     async getNonObsidianCompletedItemsActivity() {
         const completedItemsActivityEvents = await this.getCompletedItemsActivity()
         //exclude activity from Obsidian client
-        const filteredArray = completedItemsActivityEvents.filter((obj: any) => !obj.extraData?.client?.includes("obsidian"));
+        const filteredArray = completedItemsActivityEvents.filter((obj: Event) => !obj.extraData?.client?.includes("obsidian"));
         return(filteredArray)
     }
 
@@ -214,7 +204,7 @@ export class TodoistSyncAPI   {
     async  getNonObsidianUncompletedItemsActivity() {
         const uncompletedItemsActivityEvents = await this.getUncompletedItemsActivity()
         //exclude activity from Obsidian client
-        const filteredArray = uncompletedItemsActivityEvents.filter((obj: any) => !obj.extraData?.client?.includes("obsidian"));
+        const filteredArray = uncompletedItemsActivityEvents.filter((obj: Event) => !obj.extraData?.client?.includes("obsidian"));
         return(filteredArray)
     }
 
@@ -225,7 +215,7 @@ export class TodoistSyncAPI   {
         try {
             const response = await api.getActivityLogs({ objectType: 'task', eventType: 'updated' })
             return response.results || []
-        } catch (error) {
+        } catch (error: unknown) {
             console.error(error);
             throw new Error('Failed to fetch updated items due to network error');
         }
@@ -236,9 +226,9 @@ export class TodoistSyncAPI   {
     async  getNonObsidianUpdatedItemsActivity() {
         const updatedItemsActivityEvents = await this.getUpdatedItemsActivity()
         //exclude activity from Obsidian client
-        const filteredArray = updatedItemsActivityEvents.filter((obj: any) => {
+        const filteredArray = updatedItemsActivityEvents.filter((obj: Event) => {
           const client = obj.extraData && obj.extraData.client;
-          return !client || !client.includes("obsidian");
+          return !client || !(client as string).includes("obsidian");
         });
         return(filteredArray)
     }
@@ -250,7 +240,7 @@ export class TodoistSyncAPI   {
       try {
           const response = await api.getActivityLogs({ objectType: 'project' })
           return response.results || []
-      } catch (error) {
+      } catch (error: unknown) {
           console.error(error);
           throw new Error('Failed to fetch projects activities due to network error');
       }

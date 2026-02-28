@@ -17,8 +17,6 @@ The Ultimate Todoist Sync: Reborn plugin automatically creates tasks in Todoist 
 
 
 ## Features
-
-###
 | Feature                 | Sync from Obsidian to Todoist | Sync from Todoist to Obsidian | Description |
 |-------------------------|-------------------------------|-------------------------------|-------------|
 | Add task                | ✅                            | 🔜                           |             |
@@ -60,7 +58,7 @@ You can update the plugin following the same procedure, clicking `Update` instea
 
 If you would rather install the plugin manually, you can do the following:
 
-1. Download the latest release of the plugin from the [Releases](https://github.com/HeroBlackInk/ultimate-todoist-sync-for-obsidian/releases) page.
+1. Download the latest release of the plugin from the [Releases](https://github.com/phparch/ultimate-todoist-sync-reborn/releases) page.
 2. Extract the downloaded zip file and copy the entire folder to your Obsidian plugins directory.
 3. Enable the plugin in the Obsidian settings.
 
@@ -104,6 +102,10 @@ The default project in the setting applies to all files. You can set a separate 
 You can see the current file's default project in the status bar at the bottom right corner.
 <img src="/attachment/statusBar.png" width="500">
 
+
+## Network Usage
+
+This plugin communicates with the [Todoist API](https://developer.todoist.com/rest/v2) to synchronize tasks. It sends your Todoist API token (stored locally in your vault settings) with each request. No data is sent to any other service.
 
 ## Disclaimer
 

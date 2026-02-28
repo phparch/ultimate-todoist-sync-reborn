@@ -45,8 +45,8 @@ export async function obsidianFetch(
         status: response.status,
         statusText: String(response.status),
         headers: new Headers(response.headers),
-        json: async () => response.json,
-        text: async () => (typeof response.text === 'string' ? response.text : JSON.stringify(response.json)),
+        json: () => Promise.resolve(response.json),
+        text: () => Promise.resolve(typeof response.text === 'string' ? response.text : JSON.stringify(response.json)),
         clone: function () { return this; },
     } as unknown as Response;
 }
