@@ -107,11 +107,9 @@ export class TaskParser   {
         //use tag as project name
 
         let projectId = this.plugin.cacheOperation!.getDefaultProjectIdForFilepath(filepath)
-        let projectName = this.plugin.cacheOperation!.getProjectNameByIdFromCache(projectId)
 
         if(hasParent){
             projectId = parentTaskObject.projectId
-            projectName =this.plugin.cacheOperation!.getProjectNameByIdFromCache(projectId)
         }
         if(!hasParent){
                     //match tag and project
@@ -124,8 +122,7 @@ export class TaskParser   {
                 if(!hasProjectId){
                     continue
                 }
-                projectName = labelName
-                //console.log(`project is ${projectName} ${label}`)
+                //console.log(`project is ${labelName} ${label}`)
                 projectId = hasProjectId
                 break
             }
@@ -326,14 +323,8 @@ export class TaskParser   {
         if (oldDueDateUTCString === todoistTaskDue.date) {
         //console.log('due date is the same')
         return true;
-        } else if (lineTaskDue.toString() === "Invalid Date" || todoistTaskDue.toString() === "Invalid Date") {
-        console.debug('invalid date')
-        return false;
-        } else {
-        //console.log(lineTaskDue);
-        //console.log(todoistTaskDue.date)
-        return false;
         }
+        return false;
     }
 
 

@@ -23,7 +23,7 @@ export async function obsidianFetch(
                 headers[key] = value;
             });
         } else {
-            headers = init.headers as Record<string, string>;
+            headers = init.headers;
         }
     }
 

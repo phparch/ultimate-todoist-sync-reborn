@@ -73,7 +73,7 @@ export class CacheOperation   {
         })
         const newTodoistCount = metadata.todoistCount - 1
         const newMetadata: FileMetadata = { todoistTasks: newTodoistTasks, todoistCount: newTodoistCount }
-        console.debug(`new metadata ${newMetadata}`)
+        console.debug('new metadata', newMetadata)
 
 
     }
@@ -115,7 +115,7 @@ export class CacheOperation   {
                 console.debug(searchResult)
 
                 //update metadata
-                await this.updateRenamedFilePath(filepath,searchResult!)
+                this.updateRenamedFilePath(filepath,searchResult!)
                 void this.plugin.saveSettings()
 
             }
@@ -311,7 +311,7 @@ export class CacheOperation   {
           } else {
             throw new Error(`Task with ID ${taskId} not found in cache.`);
           }
-        } catch (error) {
+        } catch {
           // Handle the error appropriately, e.g. by logging it or re-throwing it.
         }
       }
@@ -445,11 +445,11 @@ export class CacheOperation   {
     }
 
 
-    async updateRenamedFilePath(oldpath:string,newpath:string){
+    updateRenamedFilePath(oldpath:string,newpath:string){
         try{
             console.debug(`oldpath is ${oldpath}`)
             console.debug(`newpath is ${newpath}`)
-            const savedTask = await this.loadTasksFromCache()
+            const savedTask = this.loadTasksFromCache()
             //console.debug(savedTask)
             const newTasks = savedTask.map((obj: TodoistTask) => {
                 if (obj.path === oldpath) {

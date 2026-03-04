@@ -203,7 +203,7 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 			console.debug(`${oldpath} is renamed`)
 			//read frontMatter
 			//const frontMatter = await this.fileOperation.getFrontMatter(file)
-			const frontMatter =  await this.cacheOperation!.getFileMetadata(oldpath)
+			const frontMatter =  this.cacheOperation!.getFileMetadata(oldpath)
 			console.debug(frontMatter)
 			if(frontMatter === null || frontMatter.todoistTasks === undefined){
 				//console.log('No tasks in the deleted file')
@@ -212,7 +212,7 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 			if(!(this.checkModuleClass())){
 					return
 				}
-			await this.cacheOperation!.updateRenamedFilePath(oldpath,file.path)
+			this.cacheOperation!.updateRenamedFilePath(oldpath,file.path)
 			void this.saveSettings()
 
 			//update task description
@@ -344,7 +344,7 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 			this.cacheOperation = undefined
 			this.fileOperation = undefined
 			this.todoistSync = undefined
-			new Notice(`Ultimate Todoist Sync: Reborn plugin initialization failed, please check the Todoist API`)
+			new Notice('Plugin initialization failed, please check the Todoist API')
 			return;
 		}
 
@@ -377,7 +377,7 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 			//initialize settings
 			this.settings.initialized = true
 			void this.saveSettings()
-			new Notice(`Ultimate Todoist Sync: Reborn initialization successful. Todoist data has been backed up.`)
+			new Notice('Initialization successful. Todoist data has been backed up.')
 
 		}
 
@@ -399,7 +399,7 @@ export default class UltimateTodoistSyncForObsidian extends Plugin {
 		//const rsp = await this.todoistSyncAPI.getUserResource()
 		this.settings.apiInitialized = true
 		this.syncLock = false
-		new Notice(`Ultimate Todoist Sync: Reborn loaded successfully.`)
+		new Notice('Plugin loaded successfully.')
 		return true
 
 

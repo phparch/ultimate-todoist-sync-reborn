@@ -52,7 +52,7 @@ export class FileOperation   {
      // complete a task, mark it as done
     async completeTaskInTheFile(taskId: string) {
         // get task file path
-        const currentTask = await this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
+        const currentTask = this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
         const filepath = currentTask!.path
 
         // get file object and update content
@@ -82,7 +82,7 @@ export class FileOperation   {
     // uncheck completed task
     async uncompleteTaskInTheFile(taskId: string) {
         // get task file path
-        const currentTask = await this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
+        const currentTask = this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
         const filepath = currentTask!.path
 
         // get file object and update content
@@ -149,9 +149,9 @@ export class FileOperation   {
             await this.app.vault.modify(file, newContent)
 
             //update filemetadate
-            const metadata = await this.plugin.cacheOperation!.getFileMetadata(filepath)
+            const metadata = this.plugin.cacheOperation!.getFileMetadata(filepath)
             if(!metadata){
-                await this.plugin.cacheOperation!.newEmptyFileMetadata(filepath)
+                this.plugin.cacheOperation!.newEmptyFileMetadata(filepath)
             }
 
         }
@@ -242,9 +242,9 @@ export class FileOperation   {
             await this.app.vault.modify(file, newContent)
 
             //update filemetadate
-            const metadata = await this.plugin.cacheOperation!.getFileMetadata(filepath)
+            const metadata = this.plugin.cacheOperation!.getFileMetadata(filepath)
             if(!metadata){
-                await this.plugin.cacheOperation!.newEmptyFileMetadata(filepath)
+                this.plugin.cacheOperation!.newEmptyFileMetadata(filepath)
             }
 
         }
@@ -254,7 +254,7 @@ export class FileOperation   {
     async syncUpdatedTaskContentToTheFile(evt: { objectId: string; extraData: { content: string } }) {
         const taskId = evt.objectId
         // get task file path
-        const currentTask = await this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
+        const currentTask = this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
         const filepath = currentTask.path
 
         // get file object and update content
@@ -290,7 +290,7 @@ export class FileOperation   {
     async syncUpdatedTaskDueDateToTheFile(evt: { objectId: string; extraData: { due_date: string } }) {
         const taskId = evt.objectId
         // get task file path
-        const currentTask = await this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
+        const currentTask = this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
         const filepath = currentTask.path
 
         // get file object and update content
@@ -349,7 +349,7 @@ export class FileOperation   {
         const note = evt.extraData.content
         const datetime = this.plugin.taskParser!.ISOStringToLocalDatetimeString(evt.eventDate)
         // get task file path
-        const currentTask = await this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
+        const currentTask = this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
         const filepath = currentTask.path
 
         // get file object and update content

@@ -97,7 +97,7 @@ export class UltimateTodoistSyncSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		new Setting(containerEl).setName('Settings for Ultimate Todoist Sync: Reborn').setHeading();
+		new Setting(containerEl).setName('General').setHeading();
 
 		const myProjectsOptions: Record<string, string> = this.plugin.settings.todoistTasksData?.projects?.reduce((obj: Record<string, string>, item: TodoistProject) => {
 			obj[(item.id).toString()] = item.name;
@@ -271,7 +271,7 @@ export class UltimateTodoistSyncSettingTab extends PluginSettingTab {
 				console.debug('checking file metadata')
 				await this.plugin.cacheOperation!.checkFileMetadata()
 				void this.plugin.saveSettings()
-				const metadatas = await this.plugin.cacheOperation!.getFileMetadatas()
+				const metadatas = this.plugin.cacheOperation!.getFileMetadatas()
 				// check default project task amounts
 				try{
 					const projectId = this.plugin.settings.defaultProjectId
@@ -303,7 +303,7 @@ export class UltimateTodoistSyncSettingTab extends PluginSettingTab {
 						let taskObject
 
 						try{
-							taskObject = await this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
+							taskObject = this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
 						}catch(error){
 							console.error(`An error occurred while loading task cache: ${(error as Error).message}`);
 						}
@@ -317,7 +317,7 @@ export class UltimateTodoistSyncSettingTab extends PluginSettingTab {
 								if ((error as Error).message.includes('404')) {
 								  // handle 404 error
 								  console.debug(`Task ${taskId} seems to not exist.`);
-								  await this.plugin.cacheOperation!.deleteTaskIdFromMetadata(key,taskId)
+								  this.plugin.cacheOperation!.deleteTaskIdFromMetadata(key,taskId)
 								  continue
 								} else {
 								  // handle other errors
@@ -345,7 +345,7 @@ export class UltimateTodoistSyncSettingTab extends PluginSettingTab {
 							//console.log(`${taskId}`)
 							let taskObject
 							try{
-								taskObject = await this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
+								taskObject = this.plugin.cacheOperation!.loadTaskFromCacheyID(taskId)
 							}catch(error){
 								console.error(`An error occurred while loading task ${taskId} from cache: ${(error as Error).message}`);
 								console.debug(taskObject)
@@ -419,8 +419,8 @@ export class UltimateTodoistSyncSettingTab extends PluginSettingTab {
 				)
 
 		new Setting(containerEl)
-			.setName('Backup Todoist data')
-			.setDesc('Click to backup Todoist data, the backed-up files will be stored in the root directory of the Obsidian vault.')
+			.setName('Back up Todoist data')
+			.setDesc('Click to back up Todoist data, the backed-up files will be stored in the root directory of the Obsidian vault.')
 			.addButton(button => button
 				.setButtonText('Backup')
 				.onClick(() => {

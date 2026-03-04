@@ -1,5 +1,5 @@
 import { TodoistApi } from "@doist/todoist-api-typescript"
-import type { Task, PersonalProject, WorkspaceProject, AddTaskArgs, UpdateTaskArgs, GetTasksArgs, GetTasksResponse, GetProjectsArgs, GetProjectsResponse, CustomFetch } from "@doist/todoist-api-typescript"
+import type { Task, PersonalProject, WorkspaceProject, AddTaskArgs, UpdateTaskArgs, GetTasksArgs, CustomFetch } from "@doist/todoist-api-typescript"
 import { App} from 'obsidian';
 import UltimateTodoistSyncForObsidian from "../main";
 import { obsidianFetch } from "./obsidianFetchAdapter";
@@ -78,24 +78,14 @@ export class TodoistRestAPI  {
     }
 
 
-    //options:{ projectId?: string, section_id?: string, label?: string , filter?: string,lang?: string, ids?: Array<string>}
-    async GetActiveTasks(options:{ projectId?: string, section_id?: string, label?: string , filter?: string,lang?: string, ids?: Array<string>}) {
+    async GetActiveTasks(options?: GetTasksArgs) {
       const api = this.initializeAPI()
       try {
-        const result = await api.getTasks(options as GetTasksArgs);
-        if (Array.isArray(result)) {
-          return result;
-        }
-        // v6 SDK returns { results, nextCursor } for paginated responses
         const allTasks: Task[] = [];
-        let response = result as GetTasksResponse;
+        let response = await api.getTasks(options);
         allTasks.push(...(response.results || []));
         while (response.nextCursor) {
-          response = await api.getTasks({ ...options, cursor: response.nextCursor } as GetTasksArgs) as GetTasksResponse;
-          if (Array.isArray(response)) {
-            allTasks.push(...response);
-            break;
-          }
+          response = await api.getTasks({ ...options, cursor: response.nextCursor });
           allTasks.push(...(response.results || []));
         }
         return allTasks;
@@ -200,20 +190,11 @@ export class TodoistRestAPI  {
     async GetAllProjects() {
         const api = this.initializeAPI()
         try {
-        const result = await api.getProjects();
-        if (Array.isArray(result)) {
-          return result;
-        }
-        // v6 SDK returns { results, nextCursor } for paginated responses
         const allProjects: (PersonalProject | WorkspaceProject)[] = [];
-        let response = result as GetProjectsResponse;
+        let response = await api.getProjects();
         allProjects.push(...(response.results || []));
         while (response.nextCursor) {
-          response = await api.getProjects({ cursor: response.nextCursor } as GetProjectsArgs) as GetProjectsResponse;
-          if (Array.isArray(response)) {
-            allProjects.push(...response);
-            break;
-          }
+          response = await api.getProjects({ cursor: response.nextCursor });
           allProjects.push(...(response.results || []));
         }
         return allProjects;

@@ -1,5 +1,6 @@
 import { App, requestUrl } from 'obsidian';
 import { TodoistApi } from "@doist/todoist-api-typescript";
+import type { CustomFetch } from "@doist/todoist-api-typescript";
 import UltimateTodoistSyncForObsidian from "../main";
 import { obsidianFetch } from "./obsidianFetchAdapter";
 
@@ -33,7 +34,7 @@ export class TodoistSyncAPI   {
 
     initializeAPI(){
         const token = this.plugin.settings.todoistAPIToken
-        const api = new TodoistApi(token, { customFetch: obsidianFetch as unknown as typeof fetch })
+        const api = new TodoistApi(token, { customFetch: obsidianFetch as unknown as CustomFetch })
         return api
     }
 
